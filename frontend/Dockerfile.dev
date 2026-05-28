@@ -1,0 +1,17 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# 先にパッケージ定義だけコピー（キャッシュを効かせるため）
+COPY package*.json ./
+
+# 依存関係のインストール
+RUN npm install
+
+# 開発用なので、ソースコードのコピーは不要（docker-composeのVolumesで同期するため）
+# ただし、フォルダ構造を維持するために node_modules 以外はあっても問題なし
+
+EXPOSE 3000
+
+# Next.jsの開発サーバーを起動
+CMD ["npm", "run", "dev"]

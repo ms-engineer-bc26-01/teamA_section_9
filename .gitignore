@@ -34,3 +34,32 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Backend (Hono)
+/backend/dist
+/backend/build
+
+# Prisma
+# SQLiteを一時的に使った場合のデータファイル
+*.db
+*.db-journal
+
+# Prisma Client の生成先を手動で変えた場合（通常は node_modules 内なので不要だが念のため）
+/backend/prisma/generated-client
+
+# Editor
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Cache
+.eslintcache
+.stylelintcache
+
+# Docker
+docker-compose.override.yml
