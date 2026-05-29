@@ -4,7 +4,7 @@
 
 作業を始める前に、以下の手順でローカル環境を立ち上げてください。
 
-**1. (初回のみ)リポジトリをクローンしてフォルダに移動する**
+**1. リポジトリをクローンしてフォルダに移動する**
 
 ```bash
 git clone [リポジトリのURL] [(任意)作業パス]
@@ -19,37 +19,58 @@ cp .env.example .env
 
 ※.envに記載するパスワードは個別で共有すること
 
-**2 Dockerでサーバを立ち上げる**
+**3 Dockerでサーバを立ち上げる（ルートディレクトリで実行）**
 
 ```bash
 docker-compose up -d
 ```
 
-**3 起動確認**
+**4 パッケージのインストールとマイグレーション実行(backendディレクトリで実行)**
+
+```bash
+cd backend
+npm install
+npm run migrate
+```
+
+**6 起動確認**
 
 ⭐️バックエンド
 
 ブラウザで `http://localhost:8000` にアクセスし、
 
-`Hello Hono!`と表示されれば準備完了です！
+`SkinMate Backend Status
+Database: ✅ 接続完了 (Connected)`
+と表示されれば準備完了です！
+DBとの接続も成功です。
+
+また、`http://localhost:8000/api/test` にアクセスし、
+`{"status":"success","message":"Hello Hono!"}`が表示されれば、
+バックエンドのAPI単体は正常に稼働しています。
 
 ⭐️フロントエンド
 
 ブラウザで `http://localhost:3000` にアクセスし、
 
-`Next.jsのページ`が表示されれば準備完了です！
+`SkinMate プロトタイプ
+バックエンドからのメッセージ： Hello Hono!`
+
+が表示されれば準備完了です！
+
+バックエンドとフロントエンドの疎通も成功です。
 
 ⭐️DB
 
 Prisma StudioでDBのテーブルを確認したい場合は、以下コマンドを実行する。
+(backendディレクトリで実行)
 
 ```bash
-docker-compose exec backend npx prisma studio --browser none --hostname 0.0.0.0
+npx dotenv -e ../.env -- npx prisma studio
 ```
 
-起動後、ブラウザで `http://localhost:5555` を開いてください。
+起動後、`http://localhost:5555` が自動で開きます。
 
-**4 コンテナ停止**
+**4 コンテナ停止（ルートディレクトリで実行）**
 
 `docker-compose down` で停止します。
 
