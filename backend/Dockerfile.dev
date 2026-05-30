@@ -1,0 +1,20 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Alpine LinuxにOpenSSLと互換ライブラリをインストール
+RUN apk add --no-cache openssl libc6-compat
+
+COPY package*.json ./
+# Prismaスキーマをコピー（型生成に必要）
+COPY prisma ./prisma/
+
+RUN npm install
+
+# Prisma Clientをコンテナの環境に合わせて生成
+RUN npx prisma generate
+
+EXPOSE 8000
+
+# 開発用サーバーを起動
+CMD ["npm", "run", "dev"]
