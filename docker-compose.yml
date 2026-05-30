@@ -18,7 +18,7 @@ services:
       dockerfile: Dockerfile.dev
     container_name: skinmate_backend
     environment:
-      DATABASE_URL: ${DOCKER_DATABASE_URL}
+      LOCAL_DATABASE_URL: ${DOCKER_DATABASE_URL}
       NODE_ENV: ${NODE_ENV}
     volumes:
       - ./backend:/app
