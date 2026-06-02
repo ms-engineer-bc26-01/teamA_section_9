@@ -1,6 +1,7 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { logger } from "hono/logger";
 import { PrismaClient } from "@prisma/client";
 
 const app = new Hono();
@@ -8,6 +9,9 @@ const prisma = new PrismaClient();
 
 // 全てのルートにcors適用
 app.use("/*", cors());
+
+// 全てのリクエストのログ取得
+app.use("*", logger());
 
 // サーバー内部で例外が起きた時の処理
 app.onError((err, c) => {
