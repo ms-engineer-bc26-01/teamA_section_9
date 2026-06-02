@@ -11,7 +11,7 @@ app.use("/*", cors());
 
 // サーバー内部で例外が起きた時の処理
 app.onError((err, c) => {
-  console.error("💥 [API Error]:", err);
+  console.error("[ERROR] API Exception:", err);
   return c.json(
     {
       status: "error",
