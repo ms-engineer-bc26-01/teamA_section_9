@@ -1,6 +1,7 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { logger } from "hono/logger";
 import { PrismaClient } from "@prisma/client";
 
 const app = new Hono();
@@ -8,6 +9,34 @@ const prisma = new PrismaClient();
 
 // 全てのルートにcors適用
 app.use("/*", cors());
+
+// 全てのリクエストのログ取得
+app.use("*", logger());
+
+// サーバー内部で例外が起きた時の処理
+app.onError((err, c) => {
+  console.error("[ERROR] API Exception:", err);
+  return c.json(
+    {
+      status: "error",
+      message: err.message || "予期せぬエラーが発生しました",
+      // development環境の時だけ詳細を表示
+      stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+    },
+    500,
+  );
+});
+
+// 存在しないURLが叩かれた時の処理
+app.notFound((c) => {
+  return c.json(
+    {
+      status: "error",
+      message: "指定されたAPIエンドポイントが見つかりません",
+    },
+    404,
+  );
+});
 
 // バックエンド疎通確認用
 app.get("/", async (c) => {
