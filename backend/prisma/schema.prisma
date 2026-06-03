@@ -13,7 +13,7 @@ datasource db {
 
 model categories {
   id         String   @id @default(uuid()) @db.Uuid
-  name       String
+  name       String?
   created_at DateTime @default(now()) @db.Timestamptz
   updated_at DateTime @updatedAt @db.Timestamptz
 
@@ -30,7 +30,7 @@ model ingredients {
 model profiles {
   id         String   @id
   name       String
-  birth_day  DateTime @db.Date
+  birth_day  DateTime? @db.Date
   skin_type  String?
   created_at DateTime @default(now()) @db.Timestamptz
   updated_at DateTime @updatedAt @db.Timestamptz
