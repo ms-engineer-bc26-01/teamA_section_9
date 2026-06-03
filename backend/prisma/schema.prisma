@@ -9,8 +9,109 @@ datasource db {
   url      = env("LOCAL_DATABASE_URL")
 }
 
-// 3. ダミーのモデル(削除予定)
-model User {
-  id    Int     @id @default(autoincrement())
-  email String  @unique
+// ----- マスタ系・プロフィール -----
+
+model categories {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String
+  created_at DateTime @default(now()) @db.Timestamptz
+  updated_at DateTime @updatedAt @db.Timestamptz
+
+  items      items[]
+}
+
+model ingredients {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String
+  created_at DateTime @default(now()) @db.Timestamptz
+  updated_at DateTime @updatedAt @db.Timestamptz
+}
+
+model profiles {
+  id         String   @id
+  name       String
+  birth_day  DateTime @db.Date
+  skin_type  String?
+  created_at DateTime @default(now()) @db.Timestamptz
+  updated_at DateTime @updatedAt @db.Timestamptz
+
+  user_items           user_items[]
+  daily_logs           daily_logs[]
+  menstruation_periods menstruation_periods[]
+  ai_suggestions       ai_suggestions[]
+}
+
+// ----- 化粧品まわり -----
+
+model items {
+  id              String     @id @default(uuid()) @db.Uuid
+  brand           String
+  name            String
+  categories_id   String     @db.Uuid
+  category        categories @relation(fields: [categories_id], references: [id])
+  ingredients_ids String[]   @db.Uuid
+  created_at      DateTime   @default(now()) @db.Timestamptz
+  updated_at      DateTime   @updatedAt @db.Timestamptz
+
+  user_items      user_items[]
+}
+
+model user_items {
+  id         String   @id @default(uuid()) @db.Uuid
+  user_id    String
+  profile    profiles @relation(fields: [user_id], references: [id])
+  item_id    String   @db.Uuid
+  item       items    @relation(fields: [item_id], references: [id])
+  created_at DateTime @default(now()) @db.Timestamptz
+  updated_at DateTime @updatedAt @db.Timestamptz
+}
+
+// ----- 記録まわり -----
+
+model menstruation_periods {
+  id         String    @id @default(uuid()) @db.Uuid
+  user_id    String
+  profile    profiles  @relation(fields: [user_id], references: [id])
+  start_date DateTime  @db.Date
+  end_date   DateTime? @db.Date
+  created_at DateTime  @default(now()) @db.Timestamptz
+  updated_at DateTime  @updatedAt @db.Timestamptz
+}
+
+model daily_logs {
+  id             String   @id @default(uuid()) @db.Uuid
+  user_id        String
+  profile        profiles @relation(fields: [user_id], references: [id])
+  log_date       DateTime @db.Date
+  skin_condition Int      @db.SmallInt
+  weather        String?
+  sleep_level    String?
+  meal_balance   String?
+  free_note      String?
+  isMenstruation Boolean
+  created_at     DateTime @default(now()) @db.Timestamptz
+  updated_at     DateTime @updatedAt @db.Timestamptz
+
+  log_used_items log_used_items[]
+}
+
+model log_used_items {
+  id           String     @id @default(uuid()) @db.Uuid
+  daily_log_id String     @db.Uuid
+  daily_log    daily_logs @relation(fields: [daily_log_id], references: [id])
+  time_of_day  String
+  items_ids    String[]   @db.Uuid
+  step_order   Int
+}
+
+model ai_suggestions {
+  id              String   @id @default(uuid()) @db.Uuid
+  user_id         String
+  profile         profiles @relation(fields: [user_id], references: [id])
+  suggested_at    DateTime @db.Timestamptz
+  suggestion_type String
+  title           String
+  body            String?
+  basis           String?
+  created_at      DateTime @default(now()) @db.Timestamptz
 }
