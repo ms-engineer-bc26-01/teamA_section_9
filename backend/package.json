@@ -5,8 +5,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "migrate": "dotenv -e ../.env -- sh -c 'DATABASE_URL=$DATABASE_URL npx prisma migrate dev'",
-    "seed": "tsx prisma/seed.ts"
+    "migrate": "dotenv -e ../.env -- npx prisma migrate dev",
+    "seed": "dotenv -e ../.env -- tsx prisma/seed.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.14",

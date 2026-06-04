@@ -1,18 +1,9 @@
-/*
-  Warnings:
-
-  - You are about to drop the `User` table. If the table is not empty, all the data it contains will be lost.
-
-*/
--- DropTable
-DROP TABLE "User";
-
 -- CreateTable
 CREATE TABLE "categories" (
     "id" UUID NOT NULL,
     "name" TEXT NOT NULL,
     "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMPTZ NOT NULL,
+    "updated_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "categories_pkey" PRIMARY KEY ("id")
 );
@@ -22,7 +13,7 @@ CREATE TABLE "ingredients" (
     "id" UUID NOT NULL,
     "name" TEXT NOT NULL,
     "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMPTZ NOT NULL,
+    "updated_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "ingredients_pkey" PRIMARY KEY ("id")
 );
@@ -30,11 +21,11 @@ CREATE TABLE "ingredients" (
 -- CreateTable
 CREATE TABLE "profiles" (
     "id" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
-    "birth_day" DATE NOT NULL,
+    "name" TEXT,
+    "birth_day" DATE,
     "skin_type" TEXT,
     "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMPTZ NOT NULL,
+    "updated_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "profiles_pkey" PRIMARY KEY ("id")
 );
@@ -45,9 +36,9 @@ CREATE TABLE "items" (
     "brand" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "categories_id" UUID NOT NULL,
-    "ingredients_ids" UUID[],
+    "ingredients_ids" UUID[] DEFAULT ARRAY[]::UUID[],
     "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMPTZ NOT NULL,
+    "updated_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "items_pkey" PRIMARY KEY ("id")
 );
@@ -58,7 +49,7 @@ CREATE TABLE "user_items" (
     "user_id" TEXT NOT NULL,
     "item_id" UUID NOT NULL,
     "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMPTZ NOT NULL,
+    "updated_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "user_items_pkey" PRIMARY KEY ("id")
 );
@@ -70,7 +61,7 @@ CREATE TABLE "menstruation_periods" (
     "start_date" DATE NOT NULL,
     "end_date" DATE,
     "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMPTZ NOT NULL,
+    "updated_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "menstruation_periods_pkey" PRIMARY KEY ("id")
 );
@@ -87,7 +78,7 @@ CREATE TABLE "daily_logs" (
     "free_note" TEXT,
     "isMenstruation" BOOLEAN NOT NULL,
     "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMPTZ NOT NULL,
+    "updated_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "daily_logs_pkey" PRIMARY KEY ("id")
 );
@@ -97,7 +88,7 @@ CREATE TABLE "log_used_items" (
     "id" UUID NOT NULL,
     "daily_log_id" UUID NOT NULL,
     "time_of_day" TEXT NOT NULL,
-    "items_ids" UUID[],
+    "items_ids" UUID[] DEFAULT ARRAY[]::UUID[],
     "step_order" INTEGER NOT NULL,
 
     CONSTRAINT "log_used_items_pkey" PRIMARY KEY ("id")
@@ -116,6 +107,12 @@ CREATE TABLE "ai_suggestions" (
 
     CONSTRAINT "ai_suggestions_pkey" PRIMARY KEY ("id")
 );
+
+-- CreateIndex
+CREATE UNIQUE INDEX "daily_logs_user_id_log_date_key" ON "daily_logs"("user_id", "log_date");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "log_used_items_daily_log_id_time_of_day_key" ON "log_used_items"("daily_log_id", "time_of_day");
 
 -- AddForeignKey
 ALTER TABLE "items" ADD CONSTRAINT "items_categories_id_fkey" FOREIGN KEY ("categories_id") REFERENCES "categories"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
