@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getLatestAiSuggestion } from "@/api/aiSuggestions";
 import { getDailyLogs } from "@/api/dailyLogs";
