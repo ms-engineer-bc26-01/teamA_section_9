@@ -20,6 +20,7 @@ services:
     environment:
       LOCAL_DATABASE_URL: ${DOCKER_DATABASE_URL}
       NODE_ENV: ${NODE_ENV}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
     volumes:
       - ./backend:/app
       - /app/node_modules

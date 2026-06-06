@@ -1,21 +1,19 @@
-import { Inter } from "next/font/google";
+import type { Metadata } from "next";
 import "./globals.css";
 
-// 変数名も Inter に合わせる
-const inter = Inter({
-  subsets: ["latin"],
-});
+export const metadata: Metadata = {
+  title: "SkinMate",
+  description: "肌とコスメの記録から最適なスキンケアを提案するアプリ",
+};
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
-    <html lang="ja" className="h-full antialiased">
-      <body className={`${inter.className} min-h-full flex flex-col`}>
-        {children}
-      </body>
+    <html lang="ja">
+      <body>{children}</body>
     </html>
   );
 }
