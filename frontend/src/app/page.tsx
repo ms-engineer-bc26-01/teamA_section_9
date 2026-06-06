@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getLatestAiSuggestion } from "@/api/aiSuggestions";
 import { getDailyLogs } from "@/api/dailyLogs";
@@ -74,6 +75,13 @@ export default function FrontendBasePage() {
             共通コンポーネント、共通レイアウト、型定義、mockデータ、API関数の初期設定を確認するページです。
           </p>
         </div>
+
+        <Link
+          href="/login"
+          className="block rounded-xl bg-gray-800 px-4 py-3 text-center text-sm font-bold text-white transition hover:bg-gray-700 active:bg-gray-900"
+        >
+          ログイン画面を確認する
+        </Link>
 
         {isLoading && <Loading text="初期データを読み込み中..." />}
 
