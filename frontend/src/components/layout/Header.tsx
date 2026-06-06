@@ -1,16 +1,19 @@
-import { APP_NAME } from "@/lib/constants";
+import type { ReactNode } from "react";
 
 type HeaderProps = {
-  title?: string;
+  title: string;
+  rightContent?: ReactNode;
 };
 
-export const Header = ({ title = APP_NAME }: HeaderProps) => {
+export const Header = ({ title, rightContent }: HeaderProps) => {
   return (
-    <header className="shrink-0 border-b border-gray-100 bg-white/90 px-5 pb-3 pt-12 backdrop-blur-md">
-      <div className="flex items-center justify-between">
-        <h1 className="text-base font-bold tracking-tight text-gray-800">
+    <header className="shrink-0 border-b border-gray-100 bg-white px-5 pb-4 pt-8">
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold tracking-tight text-gray-800">
           {title}
         </h1>
+
+        {rightContent && <div className="shrink-0">{rightContent}</div>}
       </div>
     </header>
   );
