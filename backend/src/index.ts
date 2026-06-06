@@ -3,6 +3,11 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { PrismaClient } from "@prisma/client";
+import dailyLogs from "./routes/daily-logs.js";
+import users from "./routes/users.js";
+import items from "./routes/items.js";
+import userItems from "./routes/user-items.js";
+import aiSuggestions from "./routes/ai-suggestions.js";
 
 const app = new Hono();
 const prisma = new PrismaClient();
@@ -12,6 +17,13 @@ app.use("/*", cors());
 
 // 全てのリクエストのログ取得
 app.use("*", logger());
+
+// 各APIのルーティング
+app.route("/api/users", users);
+app.route("/api/daily_logs", dailyLogs);
+app.route("/api/items", items);
+app.route("/api/user_items", userItems);
+app.route("/api/ai_suggestions", aiSuggestions);
 
 // サーバー内部で例外が起きた時の処理
 app.onError((err, c) => {
@@ -51,11 +63,24 @@ app.get("/", async (c) => {
   }
 
   return c.html(`
-    <div style="font-family: sans-serif; padding: 2rem; text-align: center;">
-      <h1>SkinMate Backend Status</h1>
-      <p style="font-size: 1.2rem;">Database: <strong>${dbStatus}</strong></p>
-      <hr />
-      <p>API: <a href="/api/test">/api/test</a></p>
+    <div style="font-family: sans-serif; padding: 2rem; max-width: 600px; margin: 0 auto;">
+      <h1 style="text-align: center;">SkinMate Backend Status</h1>
+      <div style="background: #f4f4f4; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; text-align: center;">
+        <p style="font-size: 1.2rem; margin: 0;">Database: <strong>${dbStatus}</strong></p>
+      </div>
+
+      <h2 style="font-size: 1rem; color: #666; border-bottom: 2px solid #eee; padding-bottom: 0.5rem;">API Endpoints (GET)</h2>
+      <ul style="list-style: none; padding: 0;">
+        <li style="margin: 0.8rem 0;"><a href="/api/test" style="color: #007bff; text-decoration: none;">🔗 /api/test</a> (Hello Hono!)</li>
+        <li style="margin: 0.8rem 0;"><a href="/api/users/me" style="color: #007bff; text-decoration: none;">🔗 /api/users/me</a> (Profile)</li>
+        <li style="margin: 0.8rem 0;"><a href="/api/daily_logs" style="color: #007bff; text-decoration: none;">🔗 /api/daily_logs</a> (Logs)</li>
+        <li style="margin: 0.8rem 0;"><a href="/api/items" style="color: #007bff; text-decoration: none;">🔗 /api/items</a> (Item Master)</li>
+        <li style="margin: 0.8rem 0;"><a href="/api/user_items" style="color: #007bff; text-decoration: none;">🔗 /api/user_items</a> (My Items)</li>
+        <li style="margin: 0.8rem 0;"><a href="/api/ai_suggestions" style="color: #007bff; text-decoration: none;">🔗 /api/ai_suggestions</a> (AI Suggestions)</li>
+      </ul>
+      
+      <hr style="margin-top: 2rem; border: 0; border-top: 1px solid #eee;" />
+      <p style="font-size: 0.8rem; color: #999; text-align: center;">SkinMate API v0.2.0 - Node.js Server</p>
     </div>
   `);
 });
