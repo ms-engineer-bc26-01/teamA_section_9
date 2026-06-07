@@ -48,7 +48,7 @@ export const SkinCalendar = ({ dailyLogs }: SkinCalendarProps) => {
       </div>
 
       <p className="mt-3 text-[10px] leading-relaxed text-gray-400">
-        ☺ 良好 / ☺ 普通 / ☹ 不調 / - 未記録
+        😆 良好 / ☺️ 普通 / 😢 不調 / - 未記録
       </p>
     </section>
   );
