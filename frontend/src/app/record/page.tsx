@@ -2,38 +2,38 @@
 
 import { useEffect, useState } from "react";
 import { createAiSuggestion } from "@/api/aiSuggestions";
-import { saveDailyLog } from "@/api/dailyLogs";
+import { getDailyLogByDate, saveDailyLog } from "@/api/dailyLogs";
 import { getMyUserItems } from "@/api/userItems";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
 import { Loading } from "@/components/common/Loading";
 import { AppShell } from "@/components/layout/AppShell";
 import { AiCommentModal } from "@/features/daily-log/components/AiCommentModal";
 import { DailyLogForm } from "@/features/daily-log/components/DailyLogForm";
+import { DateSelectModal } from "@/features/daily-log/components/DateSelectModal";
 import { DateSelectorButton } from "@/features/daily-log/components/DateSelectorButton";
 import type { DailyLogFormValues } from "@/features/daily-log/types";
-import { getTodayDateString } from "@/features/daily-log/utils";
+import {
+  convertDailyLogToFormValues,
+  createEmptyDailyLogFormValues,
+  getTodayDateString,
+} from "@/features/daily-log/utils";
 import type { AiSuggestion, UserItem } from "@/types/models";
 
 export default function RecordPage() {
+  const [selectedDate, setSelectedDate] = useState(getTodayDateString());
+  const [formValues, setFormValues] = useState<DailyLogFormValues>(
+    createEmptyDailyLogFormValues(getTodayDateString()),
+  );
+
   const [userItems, setUserItems] = useState<UserItem[]>([]);
   const [aiSuggestion, setAiSuggestion] = useState<AiSuggestion | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
+  const [isDailyLogLoading, setIsDailyLogLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [isDateSelectModalOpen, setIsDateSelectModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-
-  const initialValues: DailyLogFormValues = {
-    logDate: getTodayDateString(),
-    skinCondition: null,
-    weather: "",
-    sleepLevel: "",
-    mealBalance: "",
-    freeNote: "",
-    isMenstruation: false,
-    morningItemIds: [],
-    nightItemIds: [],
-  };
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -51,8 +51,35 @@ export default function RecordPage() {
     fetchInitialData();
   }, []);
 
+  useEffect(() => {
+    const fetchDailyLogBySelectedDate = async () => {
+      try {
+        setIsDailyLogLoading(true);
+        setErrorMessage("");
+
+        const dailyLog = await getDailyLogByDate(selectedDate);
+
+        if (dailyLog) {
+          setFormValues(convertDailyLogToFormValues(dailyLog));
+          return;
+        }
+
+        setFormValues(createEmptyDailyLogFormValues(selectedDate));
+      } catch (error) {
+        console.error(error);
+        setErrorMessage("選択した日付の記録取得に失敗しました。");
+      } finally {
+        setIsDailyLogLoading(false);
+      }
+    };
+
+    fetchDailyLogBySelectedDate();
+  }, [selectedDate]);
+
   const handleSubmit = async (values: DailyLogFormValues) => {
-    if (!values.skinCondition) return;
+    if (!values.skinCondition) {
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -91,7 +118,11 @@ export default function RecordPage() {
         <section className="space-y-5">
           <div className="flex items-center justify-between gap-3">
             <h1 className="text-lg font-bold text-gray-800">今日の記録</h1>
-            <DateSelectorButton logDate={initialValues.logDate} />
+
+            <DateSelectorButton
+              logDate={selectedDate}
+              onClick={() => setIsDateSelectModalOpen(true)}
+            />
           </div>
 
           {isLoading && <Loading text="記録画面を読み込み中..." />}
@@ -100,9 +131,14 @@ export default function RecordPage() {
             <ErrorMessage message={errorMessage} />
           )}
 
-          {!isLoading && !errorMessage && (
+          {!isLoading && !errorMessage && isDailyLogLoading && (
+            <Loading text="選択した日付の記録を読み込み中..." />
+          )}
+
+          {!isLoading && !errorMessage && !isDailyLogLoading && (
             <DailyLogForm
-              initialValues={initialValues}
+              key={selectedDate}
+              initialValues={formValues}
               userItems={userItems}
               isSubmitting={isSubmitting}
               onSubmit={handleSubmit}
@@ -110,6 +146,13 @@ export default function RecordPage() {
           )}
         </section>
       </AppShell>
+
+      <DateSelectModal
+        isOpen={isDateSelectModalOpen}
+        selectedDate={selectedDate}
+        onSelect={setSelectedDate}
+        onClose={() => setIsDateSelectModalOpen(false)}
+      />
 
       <AiCommentModal
         isOpen={isAiModalOpen}
