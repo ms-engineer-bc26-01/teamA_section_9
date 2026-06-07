@@ -1,10 +1,47 @@
 import { useState } from "react";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/lib/firebase"; // さっき作った設定ファイルをインポート
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+} from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 export const useAuth = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /**
+   * メールアドレスとパスワードでログイン（サインイン）する
+   */
+  const signIn = async (email: string, password: string) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      // 1. Firebase Authにメール/パスワードを送信してログイン
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password,
+      );
+      const user = userCredential.user;
+
+      // 2. バックエンド（Hono）の通信に使うための最新の「IDトークン」を取得
+      const idToken = await user.getIdToken();
+
+      console.log("====== Firebase ログイン成功！ ======");
+      console.log("Firebase UID:", user.uid);
+      console.log("IDトークン:", idToken);
+
+      return { user, idToken };
+    } catch (err: unknown) {
+      const errorMessage =
+        err instanceof Error ? err.message : "ログインに失敗しました";
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
 
   /**
    * メールアドレスとパスワードでユーザーを新規登録し、バックエンド用のIDトークンを取得する
@@ -44,6 +81,7 @@ export const useAuth = () => {
 
   return {
     signUp,
+    signIn,
     loading,
     error,
   };
