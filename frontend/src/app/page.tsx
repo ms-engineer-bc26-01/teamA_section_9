@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getLatestAiSuggestion } from "@/api/aiSuggestions";
 import { getDailyLogs } from "@/api/dailyLogs";
@@ -10,6 +9,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { AiSuggestionCard } from "@/features/home/components/AiSuggestionCard";
 import { HomeHeaderActions } from "@/features/home/components/HomeHeaderActions";
 import { SkinCalendar } from "@/features/home/components/SkinCalendar";
+import { ItemRegisterModal } from "@/features/items/components/ItemRegisterModal";
 import type { AiSuggestion, DailyLog } from "@/types/models";
 
 export default function HomePage() {
@@ -17,6 +17,8 @@ export default function HomePage() {
   const [latestSuggestion, setLatestSuggestion] = useState<AiSuggestion | null>(
     null,
   );
+
+  const [isItemRegisterModalOpen, setIsItemRegisterModalOpen] = useState(false);
 
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
@@ -41,29 +43,36 @@ export default function HomePage() {
     fetchHomeData();
   }, []);
 
-  const handleClickAddItem = () => {
-    alert("アイテム登録は後続PRで実装予定です。");
-  };
-
   return (
-    <AppShell
-      title="SkinMate"
-      headerRightContent={
-        <HomeHeaderActions onClickAddItem={handleClickAddItem} />
-      }
-    >
-      <section className="space-y-5">
-        {isLoading && <Loading text="ホーム画面を読み込み中..." />}
+    <>
+      <AppShell
+        title="SkinMate"
+        headerRightContent={
+          <HomeHeaderActions
+            onClickAddItem={() => setIsItemRegisterModalOpen(true)}
+          />
+        }
+      >
+        <section className="space-y-5">
+          {isLoading && <Loading text="ホーム画面を読み込み中..." />}
 
-        {!isLoading && errorMessage && <ErrorMessage message={errorMessage} />}
+          {!isLoading && errorMessage && (
+            <ErrorMessage message={errorMessage} />
+          )}
 
-        {!isLoading && !errorMessage && (
-          <>
-            <AiSuggestionCard suggestion={latestSuggestion} />
-            <SkinCalendar dailyLogs={dailyLogs} />
-          </>
-        )}
-      </section>
-    </AppShell>
+          {!isLoading && !errorMessage && (
+            <>
+              <AiSuggestionCard suggestion={latestSuggestion} />
+              <SkinCalendar dailyLogs={dailyLogs} />
+            </>
+          )}
+        </section>
+      </AppShell>
+
+      <ItemRegisterModal
+        isOpen={isItemRegisterModalOpen}
+        onClose={() => setIsItemRegisterModalOpen(false)}
+      />
+    </>
   );
 }
