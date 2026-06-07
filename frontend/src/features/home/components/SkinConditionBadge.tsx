@@ -12,7 +12,7 @@ const conditionMap = {
     label: "不調",
   },
   2: {
-    face: "😐",
+    face: "☺️",
     className: "text-orange-500",
     label: "普通",
   },
