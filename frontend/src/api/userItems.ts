@@ -1,42 +1,74 @@
 import { apiClient } from "@/lib/apiClient";
 import { USE_MOCK_API } from "@/lib/constants";
-import { mockItems } from "@/mocks/mockItems";
 import { mockUserItems } from "@/mocks/mockUserItems";
-import type { UserItem } from "@/types/models";
+import type { Item, UserItem } from "@/types/models";
+
+type ApiUserItemItem = {
+  id: string;
+  brand: string;
+  name: string;
+  category_id: string;
+  category_name: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type ApiUserItem = {
+  id: string;
+  item: ApiUserItemItem;
+};
+
+type GetUserItemsResponse = {
+  user_items: ApiUserItem[];
+};
+
+const toItem = (apiItem: ApiUserItemItem): Item => {
+  return {
+    id: apiItem.id,
+    brand: apiItem.brand,
+    name: apiItem.name,
+    category: {
+      id: apiItem.category_id,
+      name: apiItem.category_name ?? "未分類",
+    },
+    ingredients: [],
+    createdAt: apiItem.created_at,
+    updatedAt: apiItem.updated_at,
+  };
+};
+
+const toUserItem = (apiUserItem: ApiUserItem): UserItem => {
+  return {
+    id: apiUserItem.id,
+    userId: "",
+    item: toItem(apiUserItem.item),
+    createdAt: "",
+    updatedAt: "",
+  };
+};
 
 export const getMyUserItems = async (): Promise<UserItem[]> => {
   if (USE_MOCK_API) {
     return mockUserItems;
   }
 
-  return apiClient.get<UserItem[]>("/api/user_items");
+  const response = await apiClient.get<GetUserItemsResponse>("/api/user_items");
+
+  return response.user_items.map(toUserItem);
 };
 
+/**
+ * 今回の実API接続対象外。
+ * POST /api/user_items が対象になったタイミングで実装する。
+ */
 export const createUserItem = async (itemId: string): Promise<UserItem> => {
   if (USE_MOCK_API) {
-    const item = mockItems.find((mockItem) => mockItem.id === itemId);
+    const foundUserItem = mockUserItems.find(
+      (userItem) => userItem.item.id === itemId,
+    );
 
-    if (!item) {
-      throw new Error("対象のアイテムが見つかりません。");
-    }
-
-    return {
-      id: `user-item-${itemId}`,
-      userId: "firebase_uid_mock_001",
-      item,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    return foundUserItem ?? mockUserItems[0];
   }
 
-  return apiClient.post<UserItem>("/api/user_items", { itemId });
-};
-
-export const deleteUserItem = async (userItemId: string): Promise<void> => {
-  if (USE_MOCK_API) {
-    console.log(`mock delete user item: ${userItemId}`);
-    return;
-  }
-
-  return apiClient.delete<void>(`/api/user_items/${userItemId}`);
+  throw new Error("アイテム登録APIは今回の実API接続対象外です。");
 };

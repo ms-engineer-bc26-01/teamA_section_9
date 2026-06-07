@@ -9,7 +9,12 @@ import type {
   Weather,
 } from "@/types/models";
 
-export type SaveDailyLogPayload = {
+export type GetDailyLogsParams = {
+  startDate: string;
+  endDate: string;
+};
+
+export type SaveDailyLogRequest = {
   logDate: string;
   skinCondition: SkinCondition;
   weather?: Weather;
@@ -21,69 +26,167 @@ export type SaveDailyLogPayload = {
   nightItemIds: string[];
 };
 
-export const getDailyLogs = async (): Promise<DailyLog[]> => {
-  if (USE_MOCK_API) {
-    return mockDailyLogs;
-  }
-
-  return apiClient.get<DailyLog[]>("/api/daily_logs");
+type ApiDailyLogSummary = {
+  id: string;
+  log_date: string;
+  skin_condition: SkinCondition;
 };
 
-export const getDailyLogByDate = async (
-  logDate: string,
-): Promise<DailyLog | null> => {
+type GetDailyLogsResponse = {
+  logs: ApiDailyLogSummary[];
+};
+
+type ApiDailyLogItem = {
+  id: string;
+  brand: string;
+  name: string;
+};
+
+type ApiLogUsedItemGroup = {
+  id: string;
+  time_of_day: "morning" | "night";
+  item_ids: string[];
+  items: ApiDailyLogItem[];
+};
+
+type ApiDailyLogDetail = {
+  id: string;
+  user_id: string;
+  log_date: string;
+  skin_condition: SkinCondition;
+  weather?: Weather | null;
+  sleep_level?: SleepLevel | null;
+  meal_balance?: MealBalance | null;
+  free_note?: string | null;
+  isMenstruation: boolean;
+  used_items: {
+    morning?: ApiLogUsedItemGroup | null;
+    night?: ApiLogUsedItemGroup | null;
+  };
+  created_at: string;
+  updated_at: string;
+};
+
+type SaveDailyLogApiRequest = {
+  log_date: string;
+  skin_condition: SkinCondition;
+  weather?: Weather;
+  sleep_level?: SleepLevel;
+  meal_balance?: MealBalance;
+  free_note?: string;
+  isMenstruation: boolean;
+  used_items: {
+    morning?: {
+      item_ids: string[];
+    };
+    night?: {
+      item_ids: string[];
+    };
+  };
+};
+
+const toDailyLogFromSummary = (summary: ApiDailyLogSummary): DailyLog => {
+  return {
+    id: summary.id,
+    userId: "",
+    logDate: summary.log_date,
+    skinCondition: summary.skin_condition,
+    weather: undefined,
+    sleepLevel: undefined,
+    mealBalance: undefined,
+    freeNote: undefined,
+    isMenstruation: false,
+    usedItems: [],
+    createdAt: "",
+    updatedAt: "",
+  };
+};
+
+const toDailyLogFromDetail = (detail: ApiDailyLogDetail): DailyLog => {
+  return {
+    id: detail.id,
+    userId: detail.user_id,
+    logDate: detail.log_date,
+    skinCondition: detail.skin_condition,
+    weather: detail.weather ?? undefined,
+    sleepLevel: detail.sleep_level ?? undefined,
+    mealBalance: detail.meal_balance ?? undefined,
+    freeNote: detail.free_note ?? undefined,
+    isMenstruation: detail.isMenstruation,
+    usedItems: [],
+    createdAt: detail.created_at,
+    updatedAt: detail.updated_at,
+  };
+};
+
+const toSaveDailyLogApiRequest = (
+  request: SaveDailyLogRequest,
+): SaveDailyLogApiRequest => {
+  return {
+    log_date: request.logDate,
+    skin_condition: request.skinCondition,
+    weather: request.weather,
+    sleep_level: request.sleepLevel,
+    meal_balance: request.mealBalance,
+    free_note: request.freeNote,
+    isMenstruation: request.isMenstruation,
+    used_items: {
+      ...(request.morningItemIds.length > 0
+        ? {
+            morning: {
+              item_ids: request.morningItemIds,
+            },
+          }
+        : {}),
+      ...(request.nightItemIds.length > 0
+        ? {
+            night: {
+              item_ids: request.nightItemIds,
+            },
+          }
+        : {}),
+    },
+  };
+};
+
+export const getDailyLogs = async (
+  params: GetDailyLogsParams,
+): Promise<DailyLog[]> => {
   if (USE_MOCK_API) {
-    return mockDailyLogs.find((log) => log.logDate === logDate) ?? null;
+    return mockDailyLogs.filter(
+      (dailyLog) =>
+        dailyLog.logDate >= params.startDate &&
+        dailyLog.logDate <= params.endDate,
+    );
   }
 
-  return apiClient.get<DailyLog>(`/api/daily_logs/${logDate}`);
+  const searchParams = new URLSearchParams({
+    start_date: params.startDate,
+    end_date: params.endDate,
+  });
+
+  const response = await apiClient.get<GetDailyLogsResponse>(
+    `/api/daily_logs?${searchParams.toString()}`,
+  );
+
+  return response.logs.map(toDailyLogFromSummary);
 };
 
 export const saveDailyLog = async (
-  payload: SaveDailyLogPayload,
+  request: SaveDailyLogRequest,
 ): Promise<DailyLog> => {
   if (USE_MOCK_API) {
-    const existingLog = mockDailyLogs.find(
-      (log) => log.logDate === payload.logDate,
+    const existingDailyLog = mockDailyLogs.find(
+      (dailyLog) => dailyLog.logDate === request.logDate,
     );
 
-    if (existingLog) {
-      return {
-        ...existingLog,
-        skinCondition: payload.skinCondition,
-        weather: payload.weather,
-        sleepLevel: payload.sleepLevel,
-        mealBalance: payload.mealBalance,
-        freeNote: payload.freeNote,
-        isMenstruation: payload.isMenstruation,
-        updatedAt: new Date().toISOString(),
-      };
-    }
-
-    return {
-      id: `daily-log-${payload.logDate}`,
-      userId: "firebase_uid_mock_001",
-      logDate: payload.logDate,
-      skinCondition: payload.skinCondition,
-      weather: payload.weather,
-      sleepLevel: payload.sleepLevel,
-      mealBalance: payload.mealBalance,
-      freeNote: payload.freeNote,
-      isMenstruation: payload.isMenstruation,
-      usedItems: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    return existingDailyLog ?? mockDailyLogs[0];
   }
 
-  return apiClient.post<DailyLog>("/api/daily_logs", payload);
-};
+  const response = await apiClient.post<
+    ApiDailyLogDetail,
+    SaveDailyLogApiRequest
+  >("/api/daily_logs", toSaveDailyLogApiRequest(request));
 
-export const deleteDailyLog = async (dailyLogId: string): Promise<void> => {
-  if (USE_MOCK_API) {
-    console.log(`mock delete daily log: ${dailyLogId}`);
-    return;
-  }
-
-  return apiClient.delete<void>(`/api/daily_logs/${dailyLogId}`);
+  return toDailyLogFromDetail(response);
 };

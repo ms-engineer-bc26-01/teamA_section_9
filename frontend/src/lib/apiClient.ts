@@ -1,72 +1,88 @@
-import { API_BASE_URL } from "@/lib/constants";
+import { auth } from "@/lib/firebase";
 
-type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 type RequestOptions = {
-  method?: HttpMethod;
-  body?: unknown;
   headers?: HeadersInit;
 };
 
-export class ApiClientError extends Error {
-  status: number;
-  response?: unknown;
+const getAuthHeaders = async (): Promise<Record<string, string>> => {
+  const user = auth.currentUser;
 
-  constructor(message: string, status: number, response?: unknown) {
-    super(message);
-    this.name = "ApiClientError";
-    this.status = status;
-    this.response = response;
+  if (!user) {
+    return {};
   }
-}
 
-const request = async <T>(
+  const idToken = await user.getIdToken();
+
+  return {
+    Authorization: `Bearer ${idToken}`,
+  };
+};
+
+const buildApiUrl = (path: string) => {
+  if (!API_BASE_URL) {
+    throw new Error("NEXT_PUBLIC_API_BASE_URL is not defined.");
+  }
+
+  const baseUrl = API_BASE_URL.replace(/\/$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+
+  return `${baseUrl}${normalizedPath}`;
+};
+
+const request = async <TResponse>(
   path: string,
-  options: RequestOptions = {},
-): Promise<T> => {
-  const { method = "GET", body, headers } = options;
+  options: RequestInit = {},
+): Promise<TResponse> => {
+  const authHeaders = await getAuthHeaders();
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method,
+  const response = await fetch(buildApiUrl(path), {
+    ...options,
     headers: {
       "Content-Type": "application/json",
-      ...headers,
+      ...authHeaders,
+      ...options.headers,
     },
-    body: body ? JSON.stringify(body) : undefined,
   });
 
-  const contentType = response.headers.get("content-type");
-  const isJson = contentType?.includes("application/json");
-
-  const responseBody = isJson ? await response.json() : await response.text();
-
   if (!response.ok) {
-    const message =
-      typeof responseBody === "object" &&
-      responseBody !== null &&
-      "message" in responseBody
-        ? String(responseBody.message)
-        : "APIリクエストに失敗しました。";
+    let message = `API request failed: ${response.status}`;
 
-    throw new ApiClientError(message, response.status, responseBody);
+    try {
+      const errorBody = await response.json();
+      message = errorBody.message ?? errorBody.error ?? message;
+    } catch {
+      // JSON以外のエラーはそのまま扱う
+    }
+
+    throw new Error(message);
   }
 
-  return responseBody as T;
+  if (response.status === 204) {
+    return undefined as TResponse;
+  }
+
+  return response.json() as Promise<TResponse>;
 };
 
 export const apiClient = {
-  get: <T>(path: string, headers?: HeadersInit) =>
-    request<T>(path, { method: "GET", headers }),
+  get: async <TResponse>(path: string, options?: RequestOptions) => {
+    return request<TResponse>(path, {
+      method: "GET",
+      headers: options?.headers,
+    });
+  },
 
-  post: <T>(path: string, body?: unknown, headers?: HeadersInit) =>
-    request<T>(path, { method: "POST", body, headers }),
-
-  put: <T>(path: string, body?: unknown, headers?: HeadersInit) =>
-    request<T>(path, { method: "PUT", body, headers }),
-
-  patch: <T>(path: string, body?: unknown, headers?: HeadersInit) =>
-    request<T>(path, { method: "PATCH", body, headers }),
-
-  delete: <T>(path: string, headers?: HeadersInit) =>
-    request<T>(path, { method: "DELETE", headers }),
+  post: async <TResponse, TRequest = unknown>(
+    path: string,
+    body: TRequest,
+    options?: RequestOptions,
+  ) => {
+    return request<TResponse>(path, {
+      method: "POST",
+      body: JSON.stringify(body),
+      headers: options?.headers,
+    });
+  },
 };
