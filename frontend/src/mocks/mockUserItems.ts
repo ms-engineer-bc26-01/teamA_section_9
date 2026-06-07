@@ -23,4 +23,18 @@ export const mockUserItems: UserItem[] = [
     createdAt: "2026-05-23T00:00:00+09:00",
     updatedAt: "2026-05-23T00:00:00+09:00",
   },
+  {
+    id: "user-item-004",
+    userId: "firebase_uid_mock_001",
+    item: mockItems[3],
+    createdAt: "2026-05-23T00:00:00+09:00",
+    updatedAt: "2026-05-23T00:00:00+09:00",
+  },
+  {
+    id: "user-item-005",
+    userId: "firebase_uid_mock_001",
+    item: mockItems[4],
+    createdAt: "2026-05-23T00:00:00+09:00",
+    updatedAt: "2026-05-23T00:00:00+09:00",
+  },
 ];

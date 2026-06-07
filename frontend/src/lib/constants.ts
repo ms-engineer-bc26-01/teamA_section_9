@@ -28,9 +28,9 @@ export const WEATHER_OPTIONS = [
 ] as const;
 
 export const SLEEP_LEVEL_OPTIONS = [
-  { label: "短い", value: "short" },
+  { label: "寝不足気味", value: "short" },
   { label: "普通", value: "normal" },
-  { label: "長い", value: "long" },
+  { label: "ぐっすり", value: "long" },
 ] as const;
 
 export const MEAL_BALANCE_OPTIONS = [
