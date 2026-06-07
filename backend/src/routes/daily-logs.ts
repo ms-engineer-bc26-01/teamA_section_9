@@ -7,9 +7,94 @@ const app = new Hono();
 // TODO: 認証方針確定後、Firebase ID Token検証に差し替える
 const TEMP_USER_ID = "test-user-001";
 
-// GET /api/daily_logs ※S3-28等で実装予定
-app.get("/", (c) => {
-  return c.json({ message: "肌記録一覧取得の実装" });
+// GET /api/daily_logs (期間指定の肌記録一覧・カレンダー表示用)
+app.get("/", async (c) => {
+  const userId = TEMP_USER_ID;
+  const startDate = c.req.query("start_date");
+  const endDate = c.req.query("end_date");
+
+  if (!startDate || !endDate) {
+    return c.json(
+      { error: "BAD_REQUEST", message: "start_date と end_date は必須です" },
+      400
+    );
+  }
+
+  const logs = await prisma.daily_logs.findMany({
+    where: {
+      user_id: userId,
+      log_date: { gte: new Date(startDate), lte: new Date(endDate) },
+    },
+    orderBy: { log_date: "asc" },
+    select: { id: true, log_date: true, skin_condition: true },
+  });
+
+  return c.json({
+    logs: logs.map((l) => ({
+      id: l.id,
+      log_date: l.log_date.toISOString().slice(0, 10),
+      skin_condition: l.skin_condition,
+    })),
+  });
+});
+
+// GET /api/daily_logs/:log_date (指定日の肌記録取得)
+app.get("/:log_date", async (c) => {
+  const userId = TEMP_USER_ID;
+  const logDate = c.req.param("log_date");
+
+  const log = await prisma.daily_logs.findUnique({
+    where: {
+      user_id_log_date: { user_id: userId, log_date: new Date(logDate) },
+    },
+  });
+
+  if (!log) {
+    return c.json({ log: null });
+  }
+
+  const logGroups = await prisma.log_used_items.findMany({
+    where: { daily_log_id: log.id },
+  });
+  const logItemIds = [...new Set(logGroups.flatMap((g) => g.items_ids))];
+  const logItems = await prisma.items.findMany({
+    where: { id: { in: logItemIds } },
+  });
+  const logItemById = new Map(logItems.map((i) => [i.id, i]));
+
+  const toLogGroupJson = (timeOfDay: "morning" | "night") => {
+    const g = logGroups.find((x) => x.time_of_day === timeOfDay);
+    if (!g) return null;
+    return {
+      id: g.id,
+      time_of_day: g.time_of_day,
+      item_ids: g.items_ids,
+      items: g.items_ids
+        .map((id) => logItemById.get(id))
+        .filter(Boolean)
+        .map((it) => ({ id: it!.id, brand: it!.brand, name: it!.name })),
+    };
+  };
+
+  return c.json({
+    log: {
+      id: log.id,
+      user_id: log.user_id,
+      log_date: log.log_date.toISOString().slice(0, 10),
+      skin_condition: log.skin_condition,
+      weather: log.weather,
+      sleep_level: log.sleep_level,
+      meal_balance: log.meal_balance,
+      free_note: log.free_note,
+      isMenstruation: log.isMenstruation,
+      used_items: {
+        morning: toLogGroupJson("morning"),
+        night: toLogGroupJson("night"),
+      },
+      created_at: log.created_at,
+      updated_at: log.updated_at,
+    },
+  });
 });
 
 // POST /api/daily_logs (肌記録の作成・更新)
