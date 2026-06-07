@@ -28,3 +28,6 @@ lerna-debug.log*
 .DS_Store
 
 /src/generated/prisma
+
+# Firebase Secret Key
+firebase-service-account.json

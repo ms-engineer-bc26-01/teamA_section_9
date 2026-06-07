@@ -62,10 +62,10 @@ DBとの接続も成功です。
 ⭐️DB
 
 Prisma StudioでDBのテーブルを確認したい場合は、以下コマンドを実行する。
-(backendディレクトリで実行)
+(rootディレクトリで実行)
 
 ```bash
-npx dotenv -e ../.env -- npx prisma studio
+docker-compose exec backend npx prisma studio
 ```
 
 起動後、`http://localhost:5555` が自動で開きます。
