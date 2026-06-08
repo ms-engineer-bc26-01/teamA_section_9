@@ -1,15 +1,16 @@
 import { Hono } from "hono";
 import { prisma } from "../lib/prisma.js";
+import { getFirebaseUid } from "../lib/auth.js";
 
 const app = new Hono();
 
-// 認証(Firebase)導入までの仮ユーザーID
-// TODO: 認証方針確定後、Firebase ID Token検証に差し替える
-const TEMP_USER_ID = "test-user-001";
-
 // GET /api/daily_logs (期間指定の肌記録一覧・カレンダー表示用)
 app.get("/", async (c) => {
-  const userId = TEMP_USER_ID;
+  const userId = await getFirebaseUid(c);
+  if (!userId) {
+    return c.json({ error: "Unauthorized: トークンが無効です" }, 401);
+  }
+
   const startDate = c.req.query("start_date");
   const endDate = c.req.query("end_date");
 
@@ -40,7 +41,11 @@ app.get("/", async (c) => {
 
 // GET /api/daily_logs/:log_date (指定日の肌記録取得)
 app.get("/:log_date", async (c) => {
-  const userId = TEMP_USER_ID;
+  const userId = await getFirebaseUid(c);
+  if (!userId) {
+    return c.json({ error: "Unauthorized: トークンが無効です" }, 401);
+  }
+
   const logDate = c.req.param("log_date");
 
   const log = await prisma.daily_logs.findUnique({
@@ -99,7 +104,11 @@ app.get("/:log_date", async (c) => {
 
 // POST /api/daily_logs (肌記録の作成・更新)
 app.post("/", async (c) => {
-  const userId = TEMP_USER_ID;
+  const userId = await getFirebaseUid(c);
+  if (!userId) {
+    return c.json({ error: "Unauthorized: トークンが無効です" }, 401);
+  }
+
   const body = await c.req.json();
 
   // --- 1. 入力チェック(必須項目) ---

@@ -1,19 +1,20 @@
 import { Hono } from "hono";
 import OpenAI from "openai";
 import { prisma } from "../lib/prisma.js";
+import { getFirebaseUid } from "../lib/auth.js";
 
 const app = new Hono();
 
 // OPENAI_API_KEY は環境変数から自動で読み込まれる(S2-05)
 const openai = new OpenAI();
 
-// 認証(Firebase)導入までの仮ユーザーID
-// TODO: 認証方針確定後、Firebase ID Token検証に差し替える
-const TEMP_USER_ID = "test-user-001";
-
 // GET /api/ai_suggestions (履歴取得)
 app.get("/", async (c) => {
-  const userId = TEMP_USER_ID;
+  const userId = await getFirebaseUid(c);
+  if (!userId) {
+    return c.json({ error: "Unauthorized: トークンが無効です" }, 401);
+  }
+
   const suggestionType = c.req.query("suggestion_type");
   const sort = c.req.query("sort") === "asc" ? "asc" : "desc";
   const limit = Number(c.req.query("limit") ?? 20);
@@ -39,7 +40,11 @@ app.get("/", async (c) => {
 
 // POST /api/ai_suggestions (提案生成)
 app.post("/", async (c) => {
-  const userId = TEMP_USER_ID;
+  const userId = await getFirebaseUid(c);
+  if (!userId) {
+    return c.json({ error: "Unauthorized: トークンが無効です" }, 401);
+  }
+
   const body = await c.req.json();
   const suggestionType = body.suggestion_type;
 
