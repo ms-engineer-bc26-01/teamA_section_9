@@ -1,15 +1,15 @@
 import { Hono } from "hono";
 import { prisma } from "../lib/prisma.js";
+import { getFirebaseUid } from "../lib/auth.js";
 
 const app = new Hono();
 
-// 認証(Firebase)導入までの仮ユーザーID
-// TODO: 認証方針確定後、Firebase ID Token検証に差し替える
-const TEMP_USER_ID = "test-user-001";
-
 // GET /api/user_items (自分の手持ちアイテム一覧)
 app.get("/", async (c) => {
-  const userId = TEMP_USER_ID;
+  const userId = await getFirebaseUid(c);
+  if (!userId) {
+    return c.json({ error: "Unauthorized: トークンが無効です" }, 401);
+  }
 
   // user_itemsを取得し、関連するitem(とそのカテゴリ)も一緒に取る
   const userItems = await prisma.user_items.findMany({
