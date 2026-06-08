@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createAiSuggestion } from "@/api/aiSuggestions";
-import { getDailyLogByDate, saveDailyLog } from "@/api/dailyLogs";
+import { getDailyCommentAiSuggestion } from "@/api/aiSuggestions";
+import { saveDailyLog } from "@/api/dailyLogs";
 import { getMyUserItems } from "@/api/userItems";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
 import { Loading } from "@/components/common/Loading";
@@ -13,7 +13,6 @@ import { DateSelectModal } from "@/features/daily-log/components/DateSelectModal
 import { DateSelectorButton } from "@/features/daily-log/components/DateSelectorButton";
 import type { DailyLogFormValues } from "@/features/daily-log/types";
 import {
-  convertDailyLogToFormValues,
   createEmptyDailyLogFormValues,
   getTodayDateString,
 } from "@/features/daily-log/utils";
@@ -21,24 +20,25 @@ import type { AiSuggestion, UserItem } from "@/types/models";
 
 export default function RecordPage() {
   const [selectedDate, setSelectedDate] = useState(getTodayDateString());
-  const [formValues, setFormValues] = useState<DailyLogFormValues>(
-    createEmptyDailyLogFormValues(getTodayDateString()),
-  );
 
   const [userItems, setUserItems] = useState<UserItem[]>([]);
   const [aiSuggestion, setAiSuggestion] = useState<AiSuggestion | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
-  const [isDailyLogLoading, setIsDailyLogLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [isDateSelectModalOpen, setIsDateSelectModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
+  const initialValues = createEmptyDailyLogFormValues(selectedDate);
+
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
+        setErrorMessage("");
+
         const userItemsResponse = await getMyUserItems();
+
         setUserItems(userItemsResponse);
       } catch (error) {
         console.error(error);
@@ -48,33 +48,8 @@ export default function RecordPage() {
       }
     };
 
-    fetchInitialData();
+    void fetchInitialData();
   }, []);
-
-  useEffect(() => {
-    const fetchDailyLogBySelectedDate = async () => {
-      try {
-        setIsDailyLogLoading(true);
-        setErrorMessage("");
-
-        const dailyLog = await getDailyLogByDate(selectedDate);
-
-        if (dailyLog) {
-          setFormValues(convertDailyLogToFormValues(dailyLog));
-          return;
-        }
-
-        setFormValues(createEmptyDailyLogFormValues(selectedDate));
-      } catch (error) {
-        console.error(error);
-        setErrorMessage("選択した日付の記録取得に失敗しました。");
-      } finally {
-        setIsDailyLogLoading(false);
-      }
-    };
-
-    fetchDailyLogBySelectedDate();
-  }, [selectedDate]);
 
   const handleSubmit = async (values: DailyLogFormValues) => {
     if (!values.skinCondition) {
@@ -97,10 +72,7 @@ export default function RecordPage() {
         nightItemIds: values.nightItemIds,
       });
 
-      const suggestion = await createAiSuggestion({
-        suggestionType: "daily_comment",
-        targetDate: values.logDate,
-      });
+      const suggestion = await getDailyCommentAiSuggestion(values.logDate);
 
       setAiSuggestion(suggestion);
       setIsAiModalOpen(true);
@@ -131,14 +103,10 @@ export default function RecordPage() {
             <ErrorMessage message={errorMessage} />
           )}
 
-          {!isLoading && !errorMessage && isDailyLogLoading && (
-            <Loading text="選択した日付の記録を読み込み中..." />
-          )}
-
-          {!isLoading && !errorMessage && !isDailyLogLoading && (
+          {!isLoading && !errorMessage && (
             <DailyLogForm
               key={selectedDate}
-              initialValues={formValues}
+              initialValues={initialValues}
               userItems={userItems}
               isSubmitting={isSubmitting}
               onSubmit={handleSubmit}

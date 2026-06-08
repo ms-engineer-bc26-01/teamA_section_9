@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getLatestAiSuggestion } from "@/api/aiSuggestions";
+import { getHomeSummaryAiSuggestion } from "@/api/aiSuggestions";
 import { getDailyLogs } from "@/api/dailyLogs";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
 import { Loading } from "@/components/common/Loading";
@@ -9,8 +9,27 @@ import { AppShell } from "@/components/layout/AppShell";
 import { AiSuggestionCard } from "@/features/home/components/AiSuggestionCard";
 import { HomeHeaderActions } from "@/features/home/components/HomeHeaderActions";
 import { SkinCalendar } from "@/features/home/components/SkinCalendar";
-import { ItemRegisterModal } from "@/features/items/components/ItemRegisterModal";
 import type { AiSuggestion, DailyLog } from "@/types/models";
+
+const formatDateKey = (date: Date) => {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
+const getRecentWeekRange = () => {
+  const endDate = new Date();
+  const startDate = new Date();
+
+  startDate.setDate(endDate.getDate() - 6);
+
+  return {
+    startDate: formatDateKey(startDate),
+    endDate: formatDateKey(endDate),
+  };
+};
 
 export default function HomePage() {
   const [dailyLogs, setDailyLogs] = useState<DailyLog[]>([]);
@@ -18,20 +37,29 @@ export default function HomePage() {
     null,
   );
 
-  const [isItemRegisterModalOpen, setIsItemRegisterModalOpen] = useState(false);
-
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     const fetchHomeData = async () => {
       try {
-        const [dailyLogsResponse, latestSuggestionResponse] = await Promise.all(
-          [getDailyLogs(), getLatestAiSuggestion()],
+        setIsLoading(true);
+        setErrorMessage("");
+
+        const { startDate, endDate } = getRecentWeekRange();
+
+        const dailyLogsResponse = await getDailyLogs({
+          startDate,
+          endDate,
+        });
+
+        const suggestionResponse = await getHomeSummaryAiSuggestion(
+          startDate,
+          endDate,
         );
 
         setDailyLogs(dailyLogsResponse);
-        setLatestSuggestion(latestSuggestionResponse);
+        setLatestSuggestion(suggestionResponse);
       } catch (error) {
         console.error(error);
         setErrorMessage("ホーム画面のデータ取得に失敗しました。");
@@ -40,39 +68,32 @@ export default function HomePage() {
       }
     };
 
-    fetchHomeData();
+    void fetchHomeData();
   }, []);
 
+  const handleClickAddItem = () => {
+    alert("アイテム登録APIは今回の実API接続対象外です。");
+  };
+
   return (
-    <>
-      <AppShell
-        title="SkinMate"
-        headerRightContent={
-          <HomeHeaderActions
-            onClickAddItem={() => setIsItemRegisterModalOpen(true)}
-          />
-        }
-      >
-        <section className="space-y-5">
-          {isLoading && <Loading text="ホーム画面を読み込み中..." />}
+    <AppShell
+      title="SkinMate"
+      headerRightContent={
+        <HomeHeaderActions onClickAddItem={handleClickAddItem} />
+      }
+    >
+      <section className="space-y-5">
+        {isLoading && <Loading text="ホーム画面を読み込み中..." />}
 
-          {!isLoading && errorMessage && (
-            <ErrorMessage message={errorMessage} />
-          )}
+        {!isLoading && errorMessage && <ErrorMessage message={errorMessage} />}
 
-          {!isLoading && !errorMessage && (
-            <>
-              <AiSuggestionCard suggestion={latestSuggestion} />
-              <SkinCalendar dailyLogs={dailyLogs} />
-            </>
-          )}
-        </section>
-      </AppShell>
-
-      <ItemRegisterModal
-        isOpen={isItemRegisterModalOpen}
-        onClose={() => setIsItemRegisterModalOpen(false)}
-      />
-    </>
+        {!isLoading && !errorMessage && (
+          <>
+            <AiSuggestionCard suggestion={latestSuggestion} />
+            <SkinCalendar dailyLogs={dailyLogs} />
+          </>
+        )}
+      </section>
+    </AppShell>
   );
 }
