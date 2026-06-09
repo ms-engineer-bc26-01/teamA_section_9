@@ -10,9 +10,14 @@ import type { RegisterFormValues } from "@/features/auth/types";
 type RegisterFormProps = {
   onSubmit: (values: RegisterFormValues) => Promise<void>;
   onClickLogin: () => void;
+  isSubmitting?: boolean;
 };
 
-export const RegisterForm = ({ onSubmit, onClickLogin }: RegisterFormProps) => {
+export const RegisterForm = ({
+  onSubmit,
+  onClickLogin,
+  isSubmitting: externalIsSubmitting = false,
+}: RegisterFormProps) => {
   const [values, setValues] = useState<RegisterFormValues>({
     name: "",
     birthDay: "",
@@ -23,7 +28,9 @@ export const RegisterForm = ({ onSubmit, onClickLogin }: RegisterFormProps) => {
 
   const [isTermsAccepted, setIsTermsAccepted] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [internalIsSubmitting, setInternalIsSubmitting] = useState(false);
+
+  const isSubmitting = externalIsSubmitting || internalIsSubmitting;
 
   const handleChange = (
     key: keyof RegisterFormValues,
@@ -55,13 +62,13 @@ export const RegisterForm = ({ onSubmit, onClickLogin }: RegisterFormProps) => {
     }
 
     try {
-      setIsSubmitting(true);
+      setInternalIsSubmitting(true);
       await onSubmit(values);
     } catch (error) {
       console.error(error);
       setErrorMessage("新規登録に失敗しました。");
     } finally {
-      setIsSubmitting(false);
+      setInternalIsSubmitting(false);
     }
   };
 
@@ -70,7 +77,8 @@ export const RegisterForm = ({ onSubmit, onClickLogin }: RegisterFormProps) => {
       <button
         type="button"
         onClick={onClickLogin}
-        className="mb-6 text-sm text-gray-400 active:text-gray-600"
+        disabled={isSubmitting}
+        className="mb-6 text-sm text-gray-400 active:text-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
       >
         ← 戻る
       </button>
@@ -125,7 +133,8 @@ export const RegisterForm = ({ onSubmit, onClickLogin }: RegisterFormProps) => {
             type="checkbox"
             checked={isTermsAccepted}
             onChange={(event) => setIsTermsAccepted(event.target.checked)}
-            className="mt-0.5 rounded border-gray-300 text-rose-500 focus:ring-rose-500"
+            disabled={isSubmitting}
+            className="mt-0.5 rounded border-gray-300 text-rose-500 focus:ring-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
           />
 
           <span className="text-[10px] font-medium leading-relaxed text-gray-500">

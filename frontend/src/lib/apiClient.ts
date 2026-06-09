@@ -95,4 +95,16 @@ export const apiClient = {
       headers: options?.headers,
     });
   },
+
+  patch: async <TResponse, TRequest = unknown>(
+    path: string,
+    body: TRequest,
+    options?: RequestOptions,
+  ) => {
+    return request<TResponse>(path, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+      headers: options?.headers,
+    });
+  },
 };

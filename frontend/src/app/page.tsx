@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getHomeSummaryAiSuggestion } from "@/api/aiSuggestions";
+import { getLatestHomeSummaryAiSuggestion } from "@/api/aiSuggestions";
 import { getDailyLogs } from "@/api/dailyLogs";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
 import { Loading } from "@/components/common/Loading";
@@ -48,18 +48,18 @@ export default function HomePage() {
 
         const { startDate, endDate } = getRecentWeekRange();
 
-        const dailyLogsResponse = await getDailyLogs({
-          startDate,
-          endDate,
-        });
-
-        const suggestionResponse = await getHomeSummaryAiSuggestion(
-          startDate,
-          endDate,
+        const [dailyLogsResponse, latestSuggestionResponse] = await Promise.all(
+          [
+            getDailyLogs({
+              startDate,
+              endDate,
+            }),
+            getLatestHomeSummaryAiSuggestion(),
+          ],
         );
 
         setDailyLogs(dailyLogsResponse);
-        setLatestSuggestion(suggestionResponse);
+        setLatestSuggestion(latestSuggestionResponse);
       } catch (error) {
         console.error(error);
         setErrorMessage("ホーム画面のデータ取得に失敗しました。");
@@ -72,7 +72,7 @@ export default function HomePage() {
   }, []);
 
   const handleClickAddItem = () => {
-    alert("アイテム登録APIは今回の実API接続対象外です。");
+    alert("アイテム登録APIは後続PRで接続予定です。");
   };
 
   return (

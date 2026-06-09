@@ -12,6 +12,18 @@ type ApiUser = {
   updated_at: string;
 };
 
+export type UpdateMyProfileValues = {
+  name: string;
+  birthDay: string;
+  skinType: SkinType;
+};
+
+type UpdateMyProfileRequest = {
+  name: string;
+  birth_day: string;
+  skin_type: SkinType;
+};
+
 const toProfile = (user: ApiUser): Profile => {
   return {
     id: user.id,
@@ -29,6 +41,30 @@ export const getMyProfile = async (): Promise<Profile> => {
   }
 
   const response = await apiClient.get<ApiUser>("/api/users/me");
+
+  return toProfile(response);
+};
+
+export const updateMyProfile = async (
+  values: UpdateMyProfileValues,
+): Promise<Profile> => {
+  if (USE_MOCK_API) {
+    return {
+      ...mockProfile,
+      name: values.name,
+      birthDay: values.birthDay,
+      skinType: values.skinType,
+    };
+  }
+
+  const response = await apiClient.patch<ApiUser, UpdateMyProfileRequest>(
+    "/api/users/me",
+    {
+      name: values.name,
+      birth_day: values.birthDay,
+      skin_type: values.skinType,
+    },
+  );
 
   return toProfile(response);
 };
