@@ -1,3 +1,4 @@
+import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -6,8 +7,17 @@ type RequestOptions = {
   headers?: HeadersInit;
 };
 
+const waitForCurrentUser = (): Promise<User | null> => {
+  return new Promise((resolve) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      unsubscribe();
+      resolve(user);
+    });
+  });
+};
+
 const getAuthHeaders = async (): Promise<Record<string, string>> => {
-  const user = auth.currentUser;
+  const user = auth.currentUser ?? (await waitForCurrentUser());
 
   if (!user) {
     return {};
