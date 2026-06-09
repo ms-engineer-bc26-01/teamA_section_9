@@ -1,9 +1,58 @@
 import { PrismaClient } from "@prisma/client";
+import { readFileSync, existsSync } from "fs";
+import { join } from "path";
 
 const prisma = new PrismaClient();
 
+// backend ディレクトリで実行する前提(prisma db seed / tsx prisma/seed.ts どちらも cwd=backend)
+const TSV_PATH = join(process.cwd(), "prisma", "seed-data", "master.tsv");
+
+// Googleシートを「タブ区切り(.tsv)」でDLした想定。列の並び:
+//   A:ブランド B:商品名 C:カテゴリ D:役割 E:主要成分 F:成分コード | G:コード H:成分名 I:グループ名
+const COL = {
+  brand: 0,
+  name: 1,
+  category: 2,
+  itemCodes: 5, // F: "1, 2, 3"
+  ingCode: 6, // G
+  ingName: 7, // H
+  ingGroup: 8, // I
+} as const;
+
+function parseTsv(text: string): string[][] {
+  return text
+    .replace(/^\uFEFF/, "") // BOM除去
+    .replace(/\r/g, "") // Windows改行のCRを除去
+    .split("\n")
+    .filter((line) => line.length > 0)
+    .map((line) => line.split("\t"));
+}
+
+function cell(row: string[], idx: number): string {
+  return (row[idx] ?? "").trim();
+}
+
 async function main() {
-  // 何度でも実行できるように、既存データをFKの逆順で削除
+  if (!existsSync(TSV_PATH)) {
+    throw new Error(
+      `TSVが見つかりません: ${TSV_PATH}\n` +
+        `・backend ディレクトリで実行しているか\n` +
+        `・master.tsv を backend/prisma/seed-data/ に置いたか\n` +
+        `を確認してください`
+    );
+  }
+
+  const rows = parseTsv(readFileSync(TSV_PATH, "utf-8"));
+  const dataRows = rows.slice(1); // ヘッダ行を落とす
+
+  // 区切り間違い(CSVをDLした等)の早期検知
+  if (dataRows.length && dataRows[0].length < 6) {
+    throw new Error(
+      "列が足りません。Googleシートを「タブ区切り(.tsv)」でダウンロードしたか確認してください(CSVだと区切りが違います)"
+    );
+  }
+
+  // --- 既存データ削除(FK依存の逆順) ---
   await prisma.ai_suggestions.deleteMany();
   await prisma.log_used_items.deleteMany();
   await prisma.daily_logs.deleteMany();
@@ -14,121 +63,62 @@ async function main() {
   await prisma.ingredients.deleteMany();
   await prisma.categories.deleteMany();
 
-  // 1. カテゴリ
-  const toner = await prisma.categories.create({ data: { name: "化粧水" } });
-  const serum = await prisma.categories.create({ data: { name: "美容液" } });
-  const cream = await prisma.categories.create({ data: { name: "クリーム" } });
-  await prisma.categories.create({ data: { name: "洗顔料" } });
-  await prisma.categories.create({ data: { name: "日焼け止め" } });
+  // --- 1. 成分(G/H/I):コード→生成uuid の対応表を作る ---
+  const codeToId = new Map<string, string>();
+  for (const r of dataRows) {
+    const code = cell(r, COL.ingCode);
+    if (!code) continue; // 成分ブロックはitemsより行数が少ないのでここで自然に終わる
+    const name = cell(r, COL.ingName);
+    const group = cell(r, COL.ingGroup);
+    const ing = await prisma.ingredients.create({
+      data: { name, group_name: group || null },
+    });
+    codeToId.set(code, ing.id);
+  }
 
-  // 2. 成分
-  const hyaluronic = await prisma.ingredients.create({ data: { name: "ヒアルロン酸" } });
-  const niacinamide = await prisma.ingredients.create({ data: { name: "ナイアシンアミド" } });
-  const retinol = await prisma.ingredients.create({ data: { name: "レチノール" } });
-  const vitaminC = await prisma.ingredients.create({ data: { name: "ビタミンC" } });
-  const ceramide = await prisma.ingredients.create({ data: { name: "セラミド" } });
+  // --- 2. カテゴリ(C):実データに出てくるものを初出順に作成 ---
+  const categoryToId = new Map<string, string>();
+  for (const r of dataRows) {
+    const cat = cell(r, COL.category);
+    if (!cat || categoryToId.has(cat)) continue;
+    const c = await prisma.categories.create({ data: { name: cat } });
+    categoryToId.set(cat, c.id);
+  }
 
-  // 3. 化粧品アイテム（ingredients_ids は成分idの配列）
-  const item1 = await prisma.items.create({
-    data: {
-      brand: "SkinMate",
-      name: "モイスト化粧水",
-      categories_id: toner.id,
-      ingredients_ids: [hyaluronic.id, ceramide.id],
-    },
-  });
-  const item2 = await prisma.items.create({
-    data: {
-      brand: "SkinMate",
-      name: "ブライトニング美容液",
-      categories_id: serum.id,
-      ingredients_ids: [niacinamide.id, vitaminC.id],
-    },
-  });
-  const item3 = await prisma.items.create({
-    data: {
-      brand: "SkinMate",
-      name: "ナイトリペアクリーム",
-      categories_id: cream.id,
-      ingredients_ids: [retinol.id, ceramide.id],
-    },
-  });
+  // --- 3. items(A/B/C/F):成分コードをuuid配列に変換して投入 ---
+  let itemCount = 0;
+  for (const r of dataRows) {
+    const brand = cell(r, COL.brand);
+    const name = cell(r, COL.name);
+    if (!brand || !name) continue; // 空行・成分専用行はスキップ
 
-  // 4. プロフィール（id は自分で指定：Firebase UID 相当の文字列）
-  const user = await prisma.profiles.create({
-    data: {
-      id: "test-user-001",
-      name: "テスト 花子",
-      birth_day: new Date("1995-04-01"),
-      skin_type: "dry",
-    },
-  });
+    const cat = cell(r, COL.category);
+    const categories_id = categoryToId.get(cat);
+    if (!categories_id) {
+      throw new Error(`未知のカテゴリ "${cat}"(商品: ${name})`);
+    }
 
-  // 5. ユーザーの所有アイテム
-  await prisma.user_items.createMany({
-    data: [
-      { user_id: user.id, item_id: item1.id },
-      { user_id: user.id, item_id: item2.id },
-    ],
-  });
+    const ingredients_ids = cell(r, COL.itemCodes)
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((code) => {
+        const id = codeToId.get(code);
+        if (!id) {
+          throw new Error(`未知の成分コード "${code}"(商品: ${name})`);
+        }
+        return id;
+      });
 
-  // 6. 生理期間
-  await prisma.menstruation_periods.create({
-    data: {
-      user_id: user.id,
-      start_date: new Date("2026-05-20"),
-      end_date: new Date("2026-05-25"),
-    },
-  });
+    await prisma.items.create({
+      data: { brand, name, categories_id, ingredients_ids },
+    });
+    itemCount++;
+  }
 
-  // 7. 日々の記録（skin_condition は 1〜3）
-  const log1 = await prisma.daily_logs.create({
-    data: {
-      user_id: user.id,
-      log_date: new Date("2026-06-01"),
-      skin_condition: 2,
-      weather: "sunny",
-      sleep_level: "normal",
-      meal_balance: "good",
-      free_note: "調子はまずまず",
-      isMenstruation: false,
-    },
-  });
-  const log2 = await prisma.daily_logs.create({
-    data: {
-      user_id: user.id,
-      log_date: new Date("2026-06-02"),
-      skin_condition: 1,
-      weather: "rainy",
-      sleep_level: "short",
-      meal_balance: "bad",
-      free_note: "少し乾燥が気になる",
-      isMenstruation: true,
-    },
-  });
-
-  // 8. その記録で使ったアイテム（time_of_day: morning / night、items_ids は配列）
-  await prisma.log_used_items.createMany({
-    data: [
-      { daily_log_id: log1.id, time_of_day: "morning", items_ids: [item1.id, item2.id], step_order: 1 },
-      { daily_log_id: log1.id, time_of_day: "night", items_ids: [item1.id, item3.id], step_order: 1 },
-      { daily_log_id: log2.id, time_of_day: "morning", items_ids: [item1.id], step_order: 1 },
-    ],
-  });
-
-  // 9. AI提案（suggestion_type は仮の値。設計確定後に直す）
-  await prisma.ai_suggestions.create({
-    data: {
-      user_id: user.id,
-      suggested_at: new Date(),
-      suggestion_type: "daily_tip",
-      title: "今日のスキンケア提案",
-      body: "乾燥が気になる日は、化粧水のあとにクリームで蓋をしましょう。",
-      basis: "直近の記録で skin_condition が低めのため",
-    },
-  });
-
-  console.log("✅ Seed 完了：テストデータを投入しました");
+  console.log(
+    `✅ Seed 完了: categories ${categoryToId.size}件 / ingredients ${codeToId.size}件 / items ${itemCount}件`
+  );
 }
 
 main()
@@ -140,4 +130,3 @@ main()
     await prisma.$disconnect();
     process.exit(1);
   });
- 
