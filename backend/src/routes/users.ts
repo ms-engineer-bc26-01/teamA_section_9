@@ -61,8 +61,6 @@ app.get("/me", async (c) => {
   }
 });
 
-// PATCH /api/users/me (プロフィール編集) ※S3-10で実装予定
-app.patch("/me", (c) => {
 // PATCH /api/users/me (プロフィール編集・S3-10)
 app.patch("/me", async (c) => {
   // --- 認証(GET /me と同じインライン方式) ---
@@ -131,3 +129,5 @@ app.patch("/me", async (c) => {
     return c.json({ error: "Internal Server Error: 更新に失敗しました" }, 500);
   }
 });
+
+export default app;
