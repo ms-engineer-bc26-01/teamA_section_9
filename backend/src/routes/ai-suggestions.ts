@@ -50,8 +50,12 @@ app.post("/", async (c) => {
 
   if (!["home_summary", "daily_comment"].includes(suggestionType)) {
     return c.json(
-      { error: "BAD_REQUEST", message: "suggestion_type は home_summary か daily_comment を指定してください" },
-      400
+      {
+        error: "BAD_REQUEST",
+        message:
+          "suggestion_type は home_summary か daily_comment を指定してください",
+      },
+      400,
     );
   }
 
@@ -68,7 +72,9 @@ app.post("/", async (c) => {
     endDate = body.end_date ?? today;
     startDate =
       body.start_date ??
-      new Date(new Date(endDate).getTime() - 6 * 86400000).toISOString().slice(0, 10);
+      new Date(new Date(endDate).getTime() - 6 * 86400000)
+        .toISOString()
+        .slice(0, 10);
   }
 
   const logs = await prisma.daily_logs.findMany({
@@ -84,7 +90,9 @@ app.post("/", async (c) => {
     where: { user_id: userId },
     include: { item: true },
   });
-  const allIngredientIds = [...new Set(userItems.flatMap((ui) => ui.item.ingredients_ids))];
+  const allIngredientIds = [
+    ...new Set(userItems.flatMap((ui) => ui.item.ingredients_ids)),
+  ];
   const ingredients = await prisma.ingredients.findMany({
     where: { id: { in: allIngredientIds } },
   });
@@ -104,7 +112,7 @@ app.post("/", async (c) => {
     ? logs
         .map(
           (l) =>
-            `- ${l.log_date.toISOString().slice(0, 10)}: 肌調子${l.skin_condition}/3, 天気=${l.weather ?? "-"}, 睡眠=${l.sleep_level ?? "-"}, 食事=${l.meal_balance ?? "-"}, 生理=${l.isMenstruation ? "あり" : "なし"}, メモ=${l.free_note ?? "-"}`
+            `- ${l.log_date.toISOString().slice(0, 10)}: 肌調子${l.skin_condition}/3, 天気=${l.weather ?? "-"}, 睡眠=${l.sleep_level ?? "-"}, 食事=${l.meal_balance ?? "-"}, 生理=${l.isMenstruation ? "あり" : "なし"}, メモ=${l.free_note ?? "-"}`,
         )
         .join("\n")
     : "（対象期間の記録なし）";
@@ -115,13 +123,26 @@ app.post("/", async (c) => {
 - 医療診断や治療の指示はしない。効果効能の断定表現（治る・必ず改善する等）は使わない
 - ユーザーの手持ちアイテムの中からの提案に限定する（新しい商品を勧めない）
 - 提案には必ず理由（記録や成分に基づく根拠）を含める
-- 出力は必ず次のJSON形式のみ: {"title": "短い見出し", "body": "提案本文(200字以内)", "basis": "根拠の説明(100字以内)"}
+- 「basis」には、現在の肌状態（過去7日間の傾向や生理周期）に合わせて、一緒に使うと相乗効果が期待できる手持ちアイテムを2つ選び、必ず「商品名A ✖️ 商品名B」という形式のみで出力してください。
+- 該当する掛け合わせがない場合や、アイテムが足りない場合は null にしてください。
+- 出力は必ず次のJSON形式のみ: {"title": "短い見出し", "body": "提案本文(200字以内)", "basis": "商品名A ✖️ 商品名B (またはnull)"}
 - JSON以外の文字（前置きやコードブロック記号）は一切出力しない`;
 
   const userPrompt =
     suggestionType === "daily_comment"
       ? `今日(${endDate})の記録に対する短いコメントを作ってください。\n\n【ユーザー】肌タイプ: ${profile?.skin_type ?? "不明"}\n【今日の記録】\n${logsText}\n【手持ちアイテム】\n${itemsText}`
-      : `直近(${startDate}〜${endDate})の記録の傾向を分析し、今日のケア方針を提案してください。\n\n【ユーザー】肌タイプ: ${profile?.skin_type ?? "不明"}\n【期間の記録】\n${logsText}\n【手持ちアイテム】\n${itemsText}`;
+      : `直近(${startDate}〜${endDate})の記録の傾向（肌調子や生理周期）を分析し、ユーザーの肌に寄り添った今日のケア方針を提案してください。
+⚠️【最重要：役割分担と出力形式のルール】
+
+1. 「body」（提案本文）のルール：
+- 過去7日間の肌調子の変化や生活習慣、生理周期（ゆらぎ期など）に基づいたアドバイスを200文字以内で書いてください。
+- 【重要】「このアイテムとこのアイテムを掛け合わせて使おう」といった具体的な掛け合わせの説明や、一緒に使うことの解説は「body」の中には絶対に書かないでください。（bodyは純粋な肌の分析とケアの心構えに集中させるため）
+
+2. 「basis」のルール：
+- 現在の肌状態に対して、一緒に使うと相乗効果が期待できる手持ちアイテムを2つ厳選し、以下の形式【のみ】で出力してください。余計な説明文は一切含めないでください。
+  "basis": "商品名A ✖️ 商品名B"
+- 該当する組み合わせがない場合は、"basis": null としてください。
+      \n\n【ユーザー】肌タイプ: ${profile?.skin_type ?? "不明"}\n【期間の記録】\n${logsText}\n【手持ちアイテム】\n${itemsText}`;
 
   // --- 第3幕: OpenAI呼び出し ---
   const completion = await openai.chat.completions.create({

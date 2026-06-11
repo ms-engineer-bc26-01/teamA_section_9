@@ -31,17 +31,44 @@ export const AiSuggestionCard = ({ suggestion }: AiSuggestionCardProps) => {
             </h2>
           </div>
 
-          <p className="mb-2 text-xs font-bold leading-relaxed text-rose-600">
-            【直近1週間：水分バランス安定・透明感UP期】
-          </p>
-
           {suggestion.body && (
             <p className="text-xs leading-relaxed text-gray-600">
               {suggestion.body}
             </p>
           )}
+
+{suggestion.basis && (
+  <div className="mt-4 rounded-xl border border-rose-100 bg-rose-50/50 p-4 text-center">
+    
+    <p className="text-xs font-black tracking-wider text-rose-600 uppercase">
+      🫧 おすすめのセット 🫧
+    </p>
+    
+    {suggestion.basis.includes(" ✖️ ") ? (
+      <div className="mt-3 flex flex-col items-center justify-center text-[11px] font-medium text-gray-700">
+        
+        {/* 商品名A */}
+        <span className="leading-tight px-2">{suggestion.basis.split(" ✖️ ")[0]}</span>
+
+        <div className="flex items-center gap-1.5 my-1">
+          <div className="h-[1px] w-4 bg-rose-100" />
+          <span className="text-[14px] font-black text-rose-400 font-mono">
+            ×
+          </span>
+          <div className="h-[1px] w-4 bg-rose-100" />
         </div>
+
+          {/* 商品名B */}
+          <span className="leading-tight px-2">{suggestion.basis.split(" ✖️ ")[1]}</span>
+        </div>
+      ) : (
+        <p className="mt-2 text-[11px] font-medium text-gray-700">{suggestion.basis}</p>
+      )}
+
       </div>
-    </section>
+      )}
+      </div>
+    </div>
+  </section>
   );
 };
