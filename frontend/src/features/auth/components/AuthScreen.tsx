@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { getMyProfile } from "@/api/profiles";
+import { getMyProfile, updateMyProfile } from "@/api/profiles";
 import { LoginForm } from "@/features/auth/components/LoginForm";
 import { RegisterForm } from "@/features/auth/components/RegisterForm";
 import { useAuth } from "@/features/auth/hooks/useAuth";
@@ -26,7 +26,14 @@ export const AuthScreen = () => {
 
   const handleRegister = async (values: RegisterFormValues) => {
     await signUp(values.email, values.password);
+
     await getMyProfile();
+
+    await updateMyProfile({
+      name: values.name,
+      birthDay: values.birthDay,
+      skinType: values.skinType,
+    });
 
     router.push("/");
   };
@@ -44,11 +51,13 @@ export const AuthScreen = () => {
           <LoginForm
             onSubmit={handleLogin}
             onClickRegister={() => setAuthMode("register")}
+            isSubmitting={loading}
           />
         ) : (
           <RegisterForm
             onSubmit={handleRegister}
             onClickLogin={() => setAuthMode("login")}
+            isSubmitting={loading}
           />
         )}
       </div>
