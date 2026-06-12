@@ -61,8 +61,6 @@ app.get("/me", async (c) => {
   }
 });
 
-// PATCH /api/users/me (プロフィール編集) ※S3-10で実装予定
-app.patch("/me", (c) => {
 // PATCH /api/users/me (プロフィール編集・S3-10)
 app.patch("/me", async (c) => {
   // --- 認証(GET /me と同じインライン方式) ---
@@ -82,7 +80,11 @@ app.patch("/me", async (c) => {
   }
 
   // --- ボディ取得 ---
-  let body: { name?: string | null; birth_day?: string | null; skin_type?: string | null };
+  let body: {
+    name?: string | null;
+    birth_day?: string | null;
+    skin_type?: string | null;
+  };
   try {
     body = await c.req.json();
   } catch {
@@ -90,7 +92,11 @@ app.patch("/me", async (c) => {
   }
 
   // --- 送られてきた項目だけ更新データに詰める(部分更新) ---
-  const data: { name?: string | null; birth_day?: Date | null; skin_type?: string | null } = {};
+  const data: {
+    name?: string | null;
+    birth_day?: Date | null;
+    skin_type?: string | null;
+  } = {};
   if (body.name !== undefined) data.name = body.name;
   if (body.skin_type !== undefined) data.skin_type = body.skin_type;
   if (body.birth_day !== undefined) {
@@ -99,7 +105,12 @@ app.patch("/me", async (c) => {
     } else {
       const d = new Date(body.birth_day);
       if (isNaN(d.getTime())) {
-        return c.json({ error: "Bad Request: birth_day は YYYY-MM-DD 形式で送ってください" }, 400);
+        return c.json(
+          {
+            error: "Bad Request: birth_day は YYYY-MM-DD 形式で送ってください",
+          },
+          400,
+        );
       }
       data.birth_day = d;
     }
@@ -131,3 +142,5 @@ app.patch("/me", async (c) => {
     return c.json({ error: "Internal Server Error: 更新に失敗しました" }, 500);
   }
 });
+
+export default app;

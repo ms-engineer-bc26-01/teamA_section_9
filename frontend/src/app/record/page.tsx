@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getDailyCommentAiSuggestion } from "@/api/aiSuggestions";
+import {
+  getDailyCommentAiSuggestion,
+  getHomeSummaryAiSuggestion,
+} from "@/api/aiSuggestions";
 import { saveDailyLog } from "@/api/dailyLogs";
 import { getMyUserItems } from "@/api/userItems";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
@@ -17,6 +20,26 @@ import {
   getTodayDateString,
 } from "@/features/daily-log/utils";
 import type { AiSuggestion, UserItem } from "@/types/models";
+
+const formatDateKey = (date: Date) => {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
+const getRecentWeekRange = (baseDateString: string) => {
+  const baseDate = new Date(baseDateString);
+  const startDate = new Date(baseDate);
+
+  startDate.setDate(baseDate.getDate() - 6);
+
+  return {
+    startDate: formatDateKey(startDate),
+    endDate: formatDateKey(baseDate),
+  };
+};
 
 export default function RecordPage() {
   const [selectedDate, setSelectedDate] = useState(getTodayDateString());
@@ -72,9 +95,19 @@ export default function RecordPage() {
         nightItemIds: values.nightItemIds,
       });
 
-      const suggestion = await getDailyCommentAiSuggestion(values.logDate);
+      const dailyCommentSuggestion = await getDailyCommentAiSuggestion(
+        values.logDate,
+      );
 
-      setAiSuggestion(suggestion);
+      const { startDate, endDate } = getRecentWeekRange(values.logDate);
+
+      try {
+        await getHomeSummaryAiSuggestion(startDate, endDate);
+      } catch (error) {
+        console.error("ホーム要約AI提案の生成に失敗しました。", error);
+      }
+
+      setAiSuggestion(dailyCommentSuggestion);
       setIsAiModalOpen(true);
     } catch (error) {
       console.error(error);

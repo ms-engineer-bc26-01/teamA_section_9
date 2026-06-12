@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getMyProfile } from "@/api/profiles";
+import { getMyProfile, updateMyProfile } from "@/api/profiles";
 import { getMyUserItems } from "@/api/userItems";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
 import { Loading } from "@/components/common/Loading";
@@ -86,8 +86,20 @@ export default function MyPage() {
     }
   };
 
-  const handleSaveProfile = (updatedProfile: Profile) => {
-    setProfile(updatedProfile);
+  const handleSaveProfile = async (updatedProfile: Profile) => {
+    try {
+      const savedProfile = await updateMyProfile({
+        name: updatedProfile.name,
+        birthDay: updatedProfile.birthDay,
+        skinType: updatedProfile.skinType,
+      });
+
+      setProfile(savedProfile);
+      setErrorMessage("");
+    } catch (error) {
+      console.error(error);
+      setErrorMessage("プロフィールの保存に失敗しました。");
+    }
   };
 
   const handleLogout = () => {

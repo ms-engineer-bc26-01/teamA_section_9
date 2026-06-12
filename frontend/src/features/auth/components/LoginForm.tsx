@@ -9,16 +9,23 @@ import type { LoginFormValues } from "@/features/auth/types";
 type LoginFormProps = {
   onSubmit: (values: LoginFormValues) => Promise<void>;
   onClickRegister: () => void;
+  isSubmitting?: boolean;
 };
 
-export const LoginForm = ({ onSubmit, onClickRegister }: LoginFormProps) => {
+export const LoginForm = ({
+  onSubmit,
+  onClickRegister,
+  isSubmitting: externalIsSubmitting = false,
+}: LoginFormProps) => {
   const [values, setValues] = useState<LoginFormValues>({
     email: "",
     password: "",
   });
 
   const [errorMessage, setErrorMessage] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [internalIsSubmitting, setInternalIsSubmitting] = useState(false);
+
+  const isSubmitting = externalIsSubmitting || internalIsSubmitting;
 
   const handleChange = (key: keyof LoginFormValues, value: string) => {
     setValues((prev) => ({
@@ -37,13 +44,13 @@ export const LoginForm = ({ onSubmit, onClickRegister }: LoginFormProps) => {
     }
 
     try {
-      setIsSubmitting(true);
+      setInternalIsSubmitting(true);
       await onSubmit(values);
     } catch (error) {
       console.error(error);
       setErrorMessage("ログインに失敗しました。");
     } finally {
-      setIsSubmitting(false);
+      setInternalIsSubmitting(false);
     }
   };
 
@@ -84,7 +91,7 @@ export const LoginForm = ({ onSubmit, onClickRegister }: LoginFormProps) => {
           onChange={(event) => handleChange("password", event.target.value)}
         />
 
-        <div className="pt-4 space-y-3">
+        <div className="space-y-3 pt-4">
           <Button type="submit" fullWidth disabled={isSubmitting}>
             {isSubmitting ? "ログイン中..." : "ログイン"}
           </Button>
@@ -94,6 +101,7 @@ export const LoginForm = ({ onSubmit, onClickRegister }: LoginFormProps) => {
             variant="secondary"
             fullWidth
             onClick={onClickRegister}
+            disabled={isSubmitting}
           >
             新規登録
           </Button>
