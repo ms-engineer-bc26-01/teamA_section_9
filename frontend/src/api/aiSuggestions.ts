@@ -34,6 +34,11 @@ type ApiAiSuggestion = {
   created_at: string;
 };
 
+type GetAiSuggestionsResponse = {
+  suggestions: ApiAiSuggestion[];
+  total: number;
+};
+
 const toAiSuggestion = (apiSuggestion: ApiAiSuggestion): AiSuggestion => {
   return {
     id: apiSuggestion.id,
@@ -82,6 +87,37 @@ export const createAiSuggestion = async (
 
   return toAiSuggestion(response);
 };
+
+export const getLatestAiSuggestion = async (
+  suggestionType: AiSuggestionType = "home_summary",
+): Promise<AiSuggestion | null> => {
+  if (USE_MOCK_API) {
+    return (
+      mockAiSuggestions.find(
+        (suggestion) => suggestion.suggestionType === suggestionType,
+      ) ?? null
+    );
+  }
+
+  const searchParams = new URLSearchParams({
+    suggestion_type: suggestionType,
+    sort: "desc",
+    limit: "1",
+  });
+
+  const response = await apiClient.get<GetAiSuggestionsResponse>(
+    `/api/ai_suggestions?${searchParams.toString()}`,
+  );
+
+  return response.suggestions[0]
+    ? toAiSuggestion(response.suggestions[0])
+    : null;
+};
+
+export const getLatestHomeSummaryAiSuggestion =
+  async (): Promise<AiSuggestion | null> => {
+    return getLatestAiSuggestion("home_summary");
+  };
 
 export const getHomeSummaryAiSuggestion = async (
   startDate: string,
