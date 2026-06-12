@@ -218,7 +218,7 @@ app.patch("/:id", async (c) => {
   const id = c.req.param("id");
   const body = await c.req.json();
 
-  // --- 1. 送られてきた項目だけ更新データに詰める(部分更新) ---
+  // --- 1. 送られてきた基本項目だけ更新データに詰める(部分更新) ---
   const data: {
     skin_condition?: number;
     weather?: string | null;
@@ -251,27 +251,55 @@ app.patch("/:id", async (c) => {
     data.isMenstruation = body.isMenstruation;
   }
 
-  if (Object.keys(data).length === 0) {
+  // --- 2. 使用アイテムの指定があるか(朝・夜のどちらか) ---
+  const hasUsedItems = Boolean(
+    body.used_items?.morning?.item_ids || body.used_items?.night?.item_ids
+  );
+
+  // 基本項目も使用アイテムも一つも無ければ400
+  if (Object.keys(data).length === 0 && !hasUsedItems) {
     return c.json(
       { error: "BAD_REQUEST", message: "更新する項目がありません" },
       400
     );
   }
 
-  // --- 2. 本人の記録だけ更新(所有チェックを兼ねる) ---
-  const result = await prisma.daily_logs.updateMany({
+  // --- 3. 本人の記録か確認(所有チェック)。無ければ404 ---
+  const existing = await prisma.daily_logs.findFirst({
     where: { id, user_id: userId },
-    data,
   });
-
-  if (result.count === 0) {
+  if (!existing) {
     return c.json(
       { error: "NOT_FOUND", message: "指定の肌記録が見つかりません" },
       404
     );
   }
 
-  // --- 3. 更新後の記録を、設計書の形(DailyLogDetail)で返す ---
+  // --- 4. 基本項目を更新(更新するものがあれば) ---
+  if (Object.keys(data).length > 0) {
+    await prisma.daily_logs.update({ where: { id }, data });
+  }
+
+  // --- 5. 朝/夜の使用アイテムを更新(指定があった分だけ・POSTと同じ方式) ---
+  for (const timeOfDay of ["morning", "night"] as const) {
+    const group = body.used_items?.[timeOfDay];
+    if (group?.item_ids) {
+      await prisma.log_used_items.upsert({
+        where: {
+          daily_log_id_time_of_day: { daily_log_id: id, time_of_day: timeOfDay },
+        },
+        update: { items_ids: group.item_ids },
+        create: {
+          daily_log_id: id,
+          time_of_day: timeOfDay,
+          items_ids: group.item_ids,
+          step_order: 1,
+        },
+      });
+    }
+  }
+
+  // --- 6. 更新後の記録を、設計書の形(DailyLogDetail)で返す ---
   const log = await prisma.daily_logs.findUnique({ where: { id } });
 
   const groups = await prisma.log_used_items.findMany({
