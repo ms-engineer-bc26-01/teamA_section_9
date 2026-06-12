@@ -208,4 +208,135 @@ app.post("/", async (c) => {
   });
 });
 
+// PATCH /api/daily_logs/:id (既存の肌記録を編集・S3-26)
+app.patch("/:id", async (c) => {
+  const userId = await getFirebaseUid(c);
+  if (!userId) {
+    return c.json({ error: "Unauthorized: トークンが無効です" }, 401);
+  }
+
+  const id = c.req.param("id");
+  const body = await c.req.json();
+
+  // --- 1. 送られてきた基本項目だけ更新データに詰める(部分更新) ---
+  const data: {
+    skin_condition?: number;
+    weather?: string | null;
+    sleep_level?: string | null;
+    meal_balance?: string | null;
+    free_note?: string | null;
+    isMenstruation?: boolean;
+  } = {};
+
+  if (body.skin_condition !== undefined) {
+    if (![1, 2, 3].includes(body.skin_condition)) {
+      return c.json(
+        { error: "BAD_REQUEST", message: "skin_condition は 1〜3 で指定してください" },
+        400
+      );
+    }
+    data.skin_condition = body.skin_condition;
+  }
+  if (body.weather !== undefined) data.weather = body.weather ?? null;
+  if (body.sleep_level !== undefined) data.sleep_level = body.sleep_level ?? null;
+  if (body.meal_balance !== undefined) data.meal_balance = body.meal_balance ?? null;
+  if (body.free_note !== undefined) data.free_note = body.free_note ?? null;
+  if (body.isMenstruation !== undefined) {
+    if (typeof body.isMenstruation !== "boolean") {
+      return c.json(
+        { error: "BAD_REQUEST", message: "isMenstruation は true/false で指定してください" },
+        400
+      );
+    }
+    data.isMenstruation = body.isMenstruation;
+  }
+
+  // --- 2. 使用アイテムの指定があるか(朝・夜のどちらか) ---
+  const hasUsedItems = Boolean(
+    body.used_items?.morning?.item_ids || body.used_items?.night?.item_ids
+  );
+
+  // 基本項目も使用アイテムも一つも無ければ400
+  if (Object.keys(data).length === 0 && !hasUsedItems) {
+    return c.json(
+      { error: "BAD_REQUEST", message: "更新する項目がありません" },
+      400
+    );
+  }
+
+  // --- 3. 本人の記録か確認(所有チェック)。無ければ404 ---
+  const existing = await prisma.daily_logs.findFirst({
+    where: { id, user_id: userId },
+  });
+  if (!existing) {
+    return c.json(
+      { error: "NOT_FOUND", message: "指定の肌記録が見つかりません" },
+      404
+    );
+  }
+
+  // --- 4. 基本項目を更新(更新するものがあれば) ---
+  if (Object.keys(data).length > 0) {
+    await prisma.daily_logs.update({ where: { id }, data });
+  }
+
+  // --- 5. 朝/夜の使用アイテムを更新(指定があった分だけ・POSTと同じ方式) ---
+  for (const timeOfDay of ["morning", "night"] as const) {
+    const group = body.used_items?.[timeOfDay];
+    if (group?.item_ids) {
+      await prisma.log_used_items.upsert({
+        where: {
+          daily_log_id_time_of_day: { daily_log_id: id, time_of_day: timeOfDay },
+        },
+        update: { items_ids: group.item_ids },
+        create: {
+          daily_log_id: id,
+          time_of_day: timeOfDay,
+          items_ids: group.item_ids,
+          step_order: 1,
+        },
+      });
+    }
+  }
+
+  // --- 6. 更新後の記録を、設計書の形(DailyLogDetail)で返す ---
+  const log = await prisma.daily_logs.findUnique({ where: { id } });
+
+  const groups = await prisma.log_used_items.findMany({
+    where: { daily_log_id: id },
+  });
+  const allItemIds = [...new Set(groups.flatMap((g) => g.items_ids))];
+  const items = await prisma.items.findMany({ where: { id: { in: allItemIds } } });
+  const itemById = new Map(items.map((i) => [i.id, i]));
+
+  const toGroupJson = (timeOfDay: "morning" | "night") => {
+    const g = groups.find((x) => x.time_of_day === timeOfDay);
+    if (!g) return null;
+    return {
+      id: g.id,
+      time_of_day: g.time_of_day,
+      item_ids: g.items_ids,
+      items: g.items_ids
+        .map((iid) => itemById.get(iid))
+        .filter(Boolean)
+        .map((it) => ({ id: it!.id, brand: it!.brand, name: it!.name })),
+    };
+  };
+
+  return c.json({
+    id: log!.id,
+    user_id: log!.user_id,
+    log_date: log!.log_date.toISOString().slice(0, 10),
+    skin_condition: log!.skin_condition,
+    weather: log!.weather,
+    sleep_level: log!.sleep_level,
+    meal_balance: log!.meal_balance,
+    free_note: log!.free_note,
+    isMenstruation: log!.isMenstruation,
+    used_items: { morning: toGroupJson("morning"), night: toGroupJson("night") },
+    created_at: log!.created_at,
+    updated_at: log!.updated_at,
+  });
+});
+
 export default app;
