@@ -7,14 +7,20 @@ import { cn } from "@/lib/utils";
 type ItemSearchResultListProps = {
   items: Item[];
   selectedItemId?: string;
+  hasSearched: boolean;
   onSelect: (item: Item) => void;
 };
 
 export const ItemSearchResultList = ({
   items,
   selectedItemId,
+  hasSearched,
   onSelect,
 }: ItemSearchResultListProps) => {
+  if (!hasSearched) {
+    return null;
+  }
+
   if (items.length === 0) {
     return (
       <EmptyState
@@ -45,20 +51,22 @@ export const ItemSearchResultList = ({
                 )}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-xs font-bold text-gray-500">
-                      {item.brand}
+                      {item.brand || "ブランド未設定"}
                     </p>
+
                     <p className="mt-0.5 text-sm font-bold text-gray-800">
                       {item.name}
                     </p>
+
                     <p className="mt-1 text-[11px] text-gray-500">
-                      {item.category.name}
+                      {item.category?.name || "カテゴリ未設定"}
                     </p>
                   </div>
 
                   {isSelected && (
-                    <span className="rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                    <span className="shrink-0 rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-bold text-white">
                       選択中
                     </span>
                   )}

@@ -27,7 +27,7 @@ export const ItemSearchForm = ({
       <Input
         id="item-search-keyword"
         label="アイテム検索"
-        placeholder="ブランド名・商品名・カテゴリで検索"
+        placeholder="ブランド名・商品名で検索"
         value={keyword}
         onChange={(event) => setKeyword(event.target.value)}
       />
