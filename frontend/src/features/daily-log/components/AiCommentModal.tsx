@@ -1,28 +1,22 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/common/Button";
 import type { AiSuggestion } from "@/types/models";
 
 type AiCommentModalProps = {
   isOpen: boolean;
   suggestion: AiSuggestion | null;
+  isGenerating?: boolean;
   onClose: () => void;
 };
 
 export const AiCommentModal = ({
   isOpen,
   suggestion,
+  isGenerating = false,
   onClose,
 }: AiCommentModalProps) => {
-  const router = useRouter();
-
   if (!isOpen) return null;
-
-  const handleClickBackHome = () => {
-    onClose();
-    router.push("/");
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/45 px-6 backdrop-blur-sm">
@@ -43,7 +37,19 @@ export const AiCommentModal = ({
           </p>
 
           <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
-            {suggestion ? (
+            {isGenerating ? (
+              <div className="space-y-3 text-center">
+                <div className="mx-auto h-6 w-6 animate-spin rounded-full border-2 border-rose-200 border-t-rose-500" />
+
+                <p className="text-xs leading-relaxed text-gray-600">
+                  AIコメントを生成中です...
+                </p>
+
+                <p className="text-[10px] leading-relaxed text-gray-400">
+                  記録は保存されています。少しだけお待ちください。
+                </p>
+              </div>
+            ) : suggestion ? (
               <>
                 <p className="text-sm font-bold leading-relaxed text-rose-500">
                   {suggestion.title}
@@ -68,10 +74,11 @@ export const AiCommentModal = ({
 
           <Button
             fullWidth
-            onClick={handleClickBackHome}
-            className="rounded-2xl bg-gray-800 py-3 text-sm hover:bg-gray-900 active:bg-gray-950"
+            onClick={onClose}
+            disabled={isGenerating}
+            className="rounded-2xl bg-gray-800 py-3 text-sm hover:bg-gray-900 active:bg-gray-950 disabled:cursor-not-allowed disabled:bg-gray-400 disabled:hover:bg-gray-400"
           >
-            ホームに戻る
+            {isGenerating ? "AIコメント生成中..." : "ホームに戻る"}
           </Button>
         </div>
       </div>
