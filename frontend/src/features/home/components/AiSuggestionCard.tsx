@@ -18,7 +18,7 @@ export const AiSuggestionCard = ({ suggestion }: AiSuggestionCardProps) => {
   return (
     <section className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
       <div className="flex">
-        <div className="w-2 bg-rose-400 my-2 rounded-r" />
+        <div className="w-1 bg-rose-400" />
 
         <div className="flex-1 p-5">
           <div className="mb-2 flex items-center gap-2">
