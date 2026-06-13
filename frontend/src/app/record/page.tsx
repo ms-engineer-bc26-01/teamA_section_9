@@ -8,7 +8,6 @@ import {
   saveDailyLog,
   updateDailyLog,
 } from "@/api/dailyLogs";
-import { getMyProfile } from "@/api/profiles";
 import { getMyUserItems } from "@/api/userItems";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
 import { Loading } from "@/components/common/Loading";
@@ -126,10 +125,6 @@ export default function RecordPage() {
     const fetchInitialData = async () => {
       try {
         setErrorMessage("");
-
-        // seed後にローカルDBからprofilesが消えている場合に備えて、
-        // 記録保存前にprofilesを保証する。
-        await getMyProfile();
 
         const userItemsResponse = await getMyUserItems();
 
