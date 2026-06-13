@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getDailyCommentAiSuggestion } from "@/api/aiSuggestions";
 import {
-  getDailyCommentAiSuggestion,
-  getHomeSummaryAiSuggestion,
-} from "@/api/aiSuggestions";
-import { saveDailyLog } from "@/api/dailyLogs";
+  getDailyLogByDate,
+  saveDailyLog,
+  updateDailyLog,
+} from "@/api/dailyLogs";
 import { getMyUserItems } from "@/api/userItems";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
 import { Loading } from "@/components/common/Loading";
@@ -19,7 +21,9 @@ import {
   createEmptyDailyLogFormValues,
   getTodayDateString,
 } from "@/features/daily-log/utils";
-import type { AiSuggestion, UserItem } from "@/types/models";
+import type { AiSuggestion, DailyLog, UserItem } from "@/types/models";
+
+const HOME_SUMMARY_STORAGE_KEY = "skinmate:pending-home-summary";
 
 const formatDateKey = (date: Date) => {
   const year = date.getFullYear();
@@ -29,8 +33,15 @@ const formatDateKey = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
+const getPreviousDateString = (dateString: string) => {
+  const date = new Date(`${dateString}T00:00:00`);
+  date.setDate(date.getDate() - 1);
+
+  return formatDateKey(date);
+};
+
 const getRecentWeekRange = (baseDateString: string) => {
-  const baseDate = new Date(baseDateString);
+  const baseDate = new Date(`${baseDateString}T00:00:00`);
   const startDate = new Date(baseDate);
 
   startDate.setDate(baseDate.getDate() - 6);
@@ -41,19 +52,74 @@ const getRecentWeekRange = (baseDateString: string) => {
   };
 };
 
+const getItemIdsByTimeOfDay = (
+  dailyLog: DailyLog,
+  timeOfDay: "morning" | "night",
+): string[] => {
+  const usedItems = dailyLog.usedItems as unknown;
+
+  if (!usedItems || typeof usedItems !== "object") {
+    return [];
+  }
+
+  if (Array.isArray(usedItems)) {
+    return [];
+  }
+
+  const group = (usedItems as Record<string, unknown>)[timeOfDay];
+
+  if (!group || typeof group !== "object") {
+    return [];
+  }
+
+  const itemIds = (group as { itemIds?: unknown }).itemIds;
+
+  if (!Array.isArray(itemIds)) {
+    return [];
+  }
+
+  return itemIds.filter(
+    (itemId): itemId is string => typeof itemId === "string",
+  );
+};
+
+const toDailyLogFormValues = (dailyLog: DailyLog): DailyLogFormValues => {
+  return {
+    logDate: dailyLog.logDate,
+    skinCondition: dailyLog.skinCondition,
+    weather: dailyLog.weather ?? "",
+    sleepLevel: dailyLog.sleepLevel ?? "",
+    mealBalance: dailyLog.mealBalance ?? "",
+    freeNote: dailyLog.freeNote ?? "",
+    isMenstruation: dailyLog.isMenstruation,
+    morningItemIds: getItemIdsByTimeOfDay(dailyLog, "morning"),
+    nightItemIds: getItemIdsByTimeOfDay(dailyLog, "night"),
+  };
+};
+
 export default function RecordPage() {
+  const router = useRouter();
+
   const [selectedDate, setSelectedDate] = useState(getTodayDateString());
 
   const [userItems, setUserItems] = useState<UserItem[]>([]);
+  const [currentDailyLog, setCurrentDailyLog] = useState<DailyLog | null>(null);
+  const [initialValues, setInitialValues] = useState<DailyLogFormValues>(
+    createEmptyDailyLogFormValues(selectedDate),
+  );
+
   const [aiSuggestion, setAiSuggestion] = useState<AiSuggestion | null>(null);
+  const [savedLogDateForHomeSummary, setSavedLogDateForHomeSummary] = useState<
+    string | null
+  >(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGeneratingDailyComment, setIsGeneratingDailyComment] =
+    useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [isDateSelectModalOpen, setIsDateSelectModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-
-  const initialValues = createEmptyDailyLogFormValues(selectedDate);
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -66,13 +132,44 @@ export default function RecordPage() {
       } catch (error) {
         console.error(error);
         setErrorMessage("手持ちアイテムの取得に失敗しました。");
-      } finally {
-        setIsLoading(false);
       }
     };
 
     void fetchInitialData();
   }, []);
+
+  useEffect(() => {
+    const fetchDailyLog = async () => {
+      try {
+        setIsLoading(true);
+        setErrorMessage("");
+
+        const dailyLog = await getDailyLogByDate(selectedDate);
+
+        if (dailyLog) {
+          setCurrentDailyLog(dailyLog);
+          setInitialValues(toDailyLogFormValues(dailyLog));
+          return;
+        }
+
+        const previousDate = getPreviousDateString(selectedDate);
+        const previousDailyLog = await getDailyLogByDate(previousDate);
+
+        setCurrentDailyLog(null);
+        setInitialValues({
+          ...createEmptyDailyLogFormValues(selectedDate),
+          isMenstruation: previousDailyLog?.isMenstruation === true,
+        });
+      } catch (error) {
+        console.error(error);
+        setErrorMessage("日次記録の取得に失敗しました。");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void fetchDailyLog();
+  }, [selectedDate]);
 
   const handleSubmit = async (values: DailyLogFormValues) => {
     if (!values.skinCondition) {
@@ -83,8 +180,8 @@ export default function RecordPage() {
       setIsSubmitting(true);
       setErrorMessage("");
 
-      await saveDailyLog({
-        logDate: values.logDate,
+      const request = {
+        logDate: selectedDate,
         skinCondition: values.skinCondition,
         weather: values.weather || undefined,
         sleepLevel: values.sleepLevel || undefined,
@@ -93,22 +190,34 @@ export default function RecordPage() {
         isMenstruation: values.isMenstruation,
         morningItemIds: values.morningItemIds,
         nightItemIds: values.nightItemIds,
-      });
+      };
 
-      const dailyCommentSuggestion = await getDailyCommentAiSuggestion(
-        values.logDate,
-      );
+      const savedDailyLog = currentDailyLog
+        ? await updateDailyLog(currentDailyLog.id, request)
+        : await saveDailyLog(request);
 
-      const { startDate, endDate } = getRecentWeekRange(values.logDate);
+      setCurrentDailyLog(savedDailyLog);
+      setInitialValues(toDailyLogFormValues(savedDailyLog));
 
-      try {
-        await getHomeSummaryAiSuggestion(startDate, endDate);
-      } catch (error) {
-        console.error("ホーム要約AI提案の生成に失敗しました。", error);
-      }
-
-      setAiSuggestion(dailyCommentSuggestion);
+      // 保存完了後、まずモーダルを表示する。
+      setSavedLogDateForHomeSummary(savedDailyLog.logDate);
+      setAiSuggestion(null);
       setIsAiModalOpen(true);
+
+      // モーダル上でdaily_comment生成中を表示しながら生成する。
+      try {
+        setIsGeneratingDailyComment(true);
+
+        const dailyCommentSuggestion = await getDailyCommentAiSuggestion(
+          savedDailyLog.logDate,
+        );
+
+        setAiSuggestion(dailyCommentSuggestion);
+      } catch (error) {
+        console.error("日次AIコメントの生成に失敗しました。", error);
+      } finally {
+        setIsGeneratingDailyComment(false);
+      }
     } catch (error) {
       console.error(error);
       setErrorMessage("記録の保存に失敗しました。");
@@ -117,12 +226,39 @@ export default function RecordPage() {
     }
   };
 
+  const handleCloseAiModal = () => {
+    if (!savedLogDateForHomeSummary) {
+      setIsAiModalOpen(false);
+      router.push("/");
+      return;
+    }
+
+    const { startDate, endDate } = getRecentWeekRange(
+      savedLogDateForHomeSummary,
+    );
+
+    sessionStorage.setItem(
+      HOME_SUMMARY_STORAGE_KEY,
+      JSON.stringify({
+        startDate,
+        endDate,
+      }),
+    );
+
+    setIsAiModalOpen(false);
+    router.push("/");
+  };
+
   return (
     <>
       <AppShell title="SkinMate">
         <section className="space-y-5">
           <div className="flex items-center justify-between gap-3">
-            <h1 className="text-lg font-bold text-gray-800">今日の記録</h1>
+            <h1 className="text-lg font-bold text-gray-800">
+              {selectedDate === getTodayDateString()
+                ? "今日の記録"
+                : "日次記録"}
+            </h1>
 
             <DateSelectorButton
               logDate={selectedDate}
@@ -138,7 +274,7 @@ export default function RecordPage() {
 
           {!isLoading && !errorMessage && (
             <DailyLogForm
-              key={selectedDate}
+              key={`${selectedDate}-${currentDailyLog?.id ?? "new"}`}
               initialValues={initialValues}
               userItems={userItems}
               isSubmitting={isSubmitting}
@@ -158,7 +294,8 @@ export default function RecordPage() {
       <AiCommentModal
         isOpen={isAiModalOpen}
         suggestion={aiSuggestion}
-        onClose={() => setIsAiModalOpen(false)}
+        isGenerating={isGeneratingDailyComment}
+        onClose={handleCloseAiModal}
       />
     </>
   );
