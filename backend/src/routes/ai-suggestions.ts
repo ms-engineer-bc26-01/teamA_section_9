@@ -63,33 +63,34 @@ app.post("/", async (c) => {
   const profile = await prisma.profiles.findUnique({ where: { id: userId } });
 
   // 対象期間: daily_comment は1日 / home_summary は直近7日(指定があればそれ)
-  // 日本時間の正しい日付をtodayに入れる
-  const nowJst = new Date();
+  // 日本時間の現在日時をベースに「今日の文字列」を作る
+  const nowJst = new Date(
+    new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }),
+  );
   const realToday = `${nowJst.getFullYear()}-${String(nowJst.getMonth() + 1).padStart(2, "0")}-${String(nowJst.getDate()).padStart(2, "0")}`;
+
   const today = realToday;
+
   let startDate: string;
   let endDate: string;
+
   if (suggestionType === "daily_comment") {
-    startDate = endDate = body.target_date ?? today;
+    startDate = endDate = body.target_date ?? realToday;
   } else {
-    // 総評コメント（home_summary）は、常に「今日」から7日間とする
-    endDate = today;
-    startDate =
-      body.start_date ??
-      new Date(new Date(endDate).getTime() - 6 * 86400000)
-        .toISOString()
-        .slice(0, 10);
+    const start = new Date(nowJst);
+    start.setDate(start.getDate() - 6); // 今日を含めて7日分遡る計算
+
+    endDate = realToday;
+    startDate = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`;
   }
 
   const logs = await prisma.daily_logs.findMany({
     where: {
       user_id: userId,
-      OR: [
-        // 1. 指定された分析期間のログ
-        { log_date: { gte: new Date(startDate), lte: new Date(endDate) } },
-        // 2. 「今日」のログを取得する
-        { log_date: new Date(realToday) },
-      ],
+      log_date: {
+        gte: new Date(startDate), // startDateの0時0分0秒から
+        lte: new Date(new Date(endDate).setHours(23, 59, 59, 999)), // endDateの23時59分59秒まで
+      },
     },
     orderBy: { log_date: "asc" },
   });
@@ -117,7 +118,13 @@ app.post("/", async (c) => {
     })
     .join("\n");
 
-  const logsText = logs.length
+  // 文字列化する前にstartDate以降のデータだけに絞り込む
+  const filteredLogs = logs.filter((l) => {
+    const dateStr = `${l.log_date.getFullYear()}-${String(l.log_date.getMonth() + 1).padStart(2, "0")}-${String(l.log_date.getDate()).padStart(2, "0")}`;
+    return dateStr >= startDate; // 文字列比較で「startDate以降」のみ残す
+  });
+
+  const logsText = filteredLogs.length
     ? logs
         .map((l) => {
           // 世界標準時(UTC)から日本時間(JST)に変更
@@ -125,14 +132,20 @@ app.post("/", async (c) => {
           const mm = String(l.log_date.getMonth() + 1).padStart(2, "0");
           const dd = String(l.log_date.getDate()).padStart(2, "0");
           const pureDateStr = `${yyyy}-${mm}-${dd}`;
+          const conditionMap = { 1: "デリケート", 2: "安定", 3: "絶好調" };
+          const conditionLabel =
+            conditionMap[l.skin_condition as keyof typeof conditionMap] ??
+            "不明";
 
-          return `- ${pureDateStr}: 肌調子${l.skin_condition}/3, 天気=${l.weather ?? "-"}, 睡眠=${l.sleep_level ?? "-"}, 食事=${l.meal_balance ?? "-"}, 生理=${l.isMenstruation ? "あり" : "なし"}, メモ=${l.free_note ?? "-"}`;
+          return `- ${pureDateStr}: 肌調子${conditionLabel}(数値:${l.skin_condition}), 天気=${l.weather ?? "-"}, 睡眠=${l.sleep_level ?? "-"}, 食事=${l.meal_balance ?? "-"}, 生理=${l.isMenstruation ? "あり" : "なし"}, メモ=${l.free_note ?? "-"}`;
         })
         .join("\n")
     : "（対象期間の記録なし）";
 
+  console.log("AIに渡すログの全文:", logsText);
+
   // --- 第2幕: プロンプト組み立て ---
-  const systemPrompt = `あなたは皮膚科専門医のキャラクターとして、スキンケアアプリのユーザーにアドバイスをします。
+  const systemPrompt = `あなたは皮膚科専門医のキャラクターとして、スキンケアアプリのユーザーにアドバイスをします。今日は ${realToday} です。
 ルール:
 - 医療診断や治療の指示はしない。効果効能の断定表現（治る・必ず改善する等）は使わない
 - ユーザーの手持ちアイテムの中からの提案に限定する（新しい商品を勧めない）
@@ -142,29 +155,33 @@ app.post("/", async (c) => {
 - 成分名を根拠にする場合は、必ず【手持ちアイテム】に含まれる主成分だけを使う
 
 【最重要：タイトル（title）の絶対ルール】
-- タイトル（title）は、過去の古いデータや、新しく更新された過去の日付の数値に影響されてはいけません。必ず【今日（${today}）】という日付の肌状態（skin_condition）の数値「だけ」を基準にして決定してください。
-- もし今日（${today}）の肌状態が「3」であれば、数日前のデータがどれだけ悪くても、タイトルは100%確実に「3」のガイドライン（絶好調・調子が戻ってきた）に従わなければなりません。過去の数値でタイトルを作ることは【厳禁】です。
-- 複数日のログ（過去7日間など）を分析する場合、過去の古いデータに引きずられすぎず、【今日（${today}）の肌状態】を重視して、タイトル（title）と本文（body）の冒頭を作成してください。
+- タイトル（title）は、過去の古いデータや、新しく更新された過去の日付の数値に影響されてはいけません。必ず【今日（${realToday}）】という日付の肌状態（skin_condition）の数値「だけ」を基準にして決定してください。
+- もし今日（${realToday}）の肌状態が「3」であれば、数日前のデータがどれだけ悪くても、タイトルは100%確実に「3」のガイドライン（絶好調・調子が戻ってきた）に従わなければなりません。過去の数値でタイトルを作ることは【厳禁】です。
+- 複数日のログ（過去7日間など）を分析する場合、過去の古いデータに引きずられすぎず、【今日（${realToday}）の肌状態】を重視して、タイトル（title）と本文（body）の冒頭を作成してください。
 
 [肌状態別の表現ガイドライン（title と body 共通）]
   - 今日が「3」の場合（例え数日前が1でも）：
-    ・title：100%前向きで嬉しくなるポジティブな見出しにする。
+    ・title：『今日は肌が輝いていますね！』『最高の肌コンディションです』などの100%前向きで嬉しくなるポジティブな見出しを生成してください。
     ・body：冒頭で、今日の回復や良さを全力で一緒に喜ぶトーンにする。数日前の不調に触れる場合は、前向きな回復期として表現してください。
   - 今日が「2」の場合：
-    ・title：「お肌は安定キープです」「落ち着いた状態です」など、安心感を与える見出しにする。
+    ・title：「お肌は安定キープです」「落ち着いた状態です」など、安心感を与える見出しを生成してください。
     ・body：「今日のお肌は落ち着いていますね」など、安定した状態を褒める表現にする。
   - 今日が「1」の場合：
-    ・title：「デリケートな肌状態です」「無理せずケアしましょう」など、寄り添う見出しにする。
+    ・title：「デリケートな肌状態です」「無理せずケアしましょう」など、寄り添う見出しを生成してください。
     ・body：「今日はお肌が少しデリケートな状態ですね」など、優しく労り、寄り添うトーンにする。
 
 【おすすめセット（basis）の出力ルール】
-- suggestion_type が「daily_comment」の場合、必ず "basis": null と出力してください。
+- suggestion_type が「daily_comment」の場合、必ず "basis": null と出力してください。このタイプで商品セットを出力することはプロンプト違反とみなします。
 - suggestion_type が「home_summary」の場合のみ、basis に手持ちアイテム2つの組み合わせを出力してください。
-- basis は必ず「商品名A × 商品名B」の形式、または null にしてください。
-- basis に使う商品名は、必ず【手持ちアイテム】に存在する表記をそのまま使ってください。
-- body には具体的な商品名やおすすめセットを書かないでください。
-- 出力は必ず次のJSON形式のみ: {"title": "短い見出し", "body": "提案本文(200字以内)", "basis": "商品名A × 商品名B (またはnull)"}
-- JSON以外の文字（前置きやコードブロック記号）は一切出力しない`;
+- basis は "商品名A × 商品名B" という形式の文字列のみです。
+- 【最重要：禁止事項】
+  - basis の中に、成分名、効果、解説、理由、説明文、句読点、記号を一切含めてはなりません。
+  - AIがセット選出に迷った場合でも、無理に解説を混ぜず "basis": null としてください。
+  - basis は「どのアイテムか」を示すラベルとしてのみ機能させてください。
+- 出力形式の絶対遵守:
+  - 前置き、挨拶、マークダウンのコードブロック（\`\`\`json 等）は一切禁止です。
+  - 以下のJSON文字列のみを出力してください:
+    {"title": "短い見出し", "body": "提案本文(200字以内)", "basis": "商品名A × 商品名B (またはnull)"}`;
 
   const userPrompt =
     suggestionType === "daily_comment"
@@ -173,8 +190,19 @@ app.post("/", async (c) => {
         1. タイトル（title）は、systemPromptの「今日」ではなく、必ずこの【対象日（${endDate}）】の肌状態の数値に合わせて作成してください。
         2. 具体的な商品の提案は一切不要です。今回は対象日のお肌のレビューと労いのコメントに集中してください。
         3. 【重要】systemPromptのガイドラインにある「数日前の不調に触れる」などの過去の振り返りは【禁止】します。「ここ数日〜」といった表現は使わず、対象日（1日分）の記録（睡眠、天気、食事、生理、メモなど）だけをしっかり読み取り、その日の頑張りや状態に対する純粋な感想（レビュー）と労いのコメントを作成してください。
+        4. 【絶対禁止事項】
+           - 商品の具体的な提案や、特定の成分（セラミド、ビタミンCなど）を推奨するアドバイスは一切禁止です。
+           - あくまでその日の頑張りへの労いや、状態に対する寄り添いと共感のみを行ってください。
+           - 「今日のアドバイス」ではなく「今日のレビューと労い」を主目的とすること。
       \n\n【ユーザー】肌タイプ: ${profile?.skin_type ?? "不明"}\n【対象日の記録】\n${logsText}`
       : `直近(${startDate}〜${endDate})の記録の傾向（肌調子や生理周期）を分析し、ユーザーの肌に寄り添った今日のケア方針を提案してください。
+        
+        【重要な前提情報】
+        【今日の日付】: ${realToday}
+        【期間の記録】:
+        ${logsText}
+        (※もし上記ログに ${realToday} の記録が含まれていない場合は、『今日の肌状態は未記録である』と認識して判断してください）
+
 【最重要：役割分担と出力形式のルール】
 1. 「body」（提案本文）のルール：
 - 過去7日間の肌調子の変化や生活習慣、生理周期（ゆらぎ期など）に基づいたアドバイスを200文字以内で書いてください。
