@@ -1,30 +1,71 @@
+import {
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+  type User,
+} from "firebase/auth";
+import { auth } from "@/lib/firebase";
+
 export type AuthUser = {
   uid: string;
   email: string | null;
 };
 
+const toAuthUser = (user: User): AuthUser => {
+  return {
+    uid: user.uid,
+    email: user.email,
+  };
+};
+
+const waitForCurrentUser = (): Promise<User | null> => {
+  return new Promise((resolve) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      unsubscribe();
+      resolve(user);
+    });
+  });
+};
+
 export const authClient = {
   getCurrentUser: async (): Promise<AuthUser | null> => {
-    // TODO: Firebase Auth 実装時に差し替える
-    return null;
+    const user = auth.currentUser ?? (await waitForCurrentUser());
+
+    if (!user) {
+      return null;
+    }
+
+    return toAuthUser(user);
   },
 
   getIdToken: async (): Promise<string | null> => {
-    // TODO: Firebase Auth 実装時に差し替える
-    return null;
+    const user = auth.currentUser ?? (await waitForCurrentUser());
+
+    if (!user) {
+      return null;
+    }
+
+    return user.getIdToken();
   },
 
-  login: async (_email: string, _password: string): Promise<AuthUser> => {
-    // TODO: Firebase Auth 実装時に差し替える
-    throw new Error("Firebase Auth is not implemented yet.");
+  login: async (email: string, password: string): Promise<AuthUser> => {
+    const credential = await signInWithEmailAndPassword(auth, email, password);
+
+    return toAuthUser(credential.user);
   },
 
-  register: async (_email: string, _password: string): Promise<AuthUser> => {
-    // TODO: Firebase Auth 実装時に差し替える
-    throw new Error("Firebase Auth is not implemented yet.");
+  register: async (email: string, password: string): Promise<AuthUser> => {
+    const credential = await createUserWithEmailAndPassword(
+      auth,
+      email,
+      password,
+    );
+
+    return toAuthUser(credential.user);
   },
 
   logout: async (): Promise<void> => {
-    // TODO: Firebase Auth 実装時に差し替える
+    await signOut(auth);
   },
 };
