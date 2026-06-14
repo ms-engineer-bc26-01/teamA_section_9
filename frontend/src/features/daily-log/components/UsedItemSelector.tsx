@@ -26,14 +26,7 @@ const timeOfDayConfig = {
   },
 } as const;
 
-const categoryOrder = [
-  "すべて",
-  "洗顔料",
-  "化粧水",
-  "美容液",
-  "クリーム",
-  "日焼け止め",
-];
+const ALL_CATEGORY = "すべて";
 
 export const UsedItemSelector = ({
   timeOfDay,
@@ -45,7 +38,7 @@ export const UsedItemSelector = ({
   const [draftSelectedItemIds, setDraftSelectedItemIds] = useState<string[]>(
     [],
   );
-  const [selectedCategory, setSelectedCategory] = useState("すべて");
+  const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORY);
 
   const config = timeOfDayConfig[timeOfDay];
 
@@ -54,17 +47,15 @@ export const UsedItemSelector = ({
   );
 
   const categories = useMemo(() => {
-    const categoryNames = Array.from(
-      new Set(userItems.map((userItem) => userItem.item.category.name)),
-    );
+    const categoryNames = userItems
+      .map((userItem) => userItem.item.category.name)
+      .filter((categoryName): categoryName is string => Boolean(categoryName));
 
-    return categoryOrder.filter(
-      (category) => category === "すべて" || categoryNames.includes(category),
-    );
+    return [ALL_CATEGORY, ...Array.from(new Set(categoryNames))];
   }, [userItems]);
 
   const filteredUserItems = useMemo(() => {
-    if (selectedCategory === "すべて") {
+    if (selectedCategory === ALL_CATEGORY) {
       return userItems;
     }
 
@@ -75,7 +66,7 @@ export const UsedItemSelector = ({
 
   const handleOpenModal = () => {
     setDraftSelectedItemIds(selectedItemIds);
-    setSelectedCategory("すべて");
+    setSelectedCategory(ALL_CATEGORY);
     setIsModalOpen(true);
   };
 
@@ -201,20 +192,22 @@ export const UsedItemSelector = ({
                       )}
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-[10px] font-bold text-gray-500">
-                            {item.brand}
+                            {item.brand || "ブランド未設定"}
                           </p>
+
                           <p className="mt-0.5 text-[11px] font-bold text-gray-800">
                             {item.name}
                           </p>
+
                           <p className="mt-1 text-[10px] text-gray-500">
                             {item.category.name}
                           </p>
                         </div>
 
                         {isSelected && (
-                          <span className="rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                          <span className="shrink-0 rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-bold text-white">
                             選択中
                           </span>
                         )}

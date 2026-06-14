@@ -107,4 +107,11 @@ export const apiClient = {
       headers: options?.headers,
     });
   },
+
+  delete: async <TResponse = void>(path: string, options?: RequestOptions) => {
+    return request<TResponse>(path, {
+      method: "DELETE",
+      headers: options?.headers,
+    });
+  },
 };

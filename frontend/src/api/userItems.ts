@@ -5,7 +5,7 @@ import type { Item, UserItem } from "@/types/models";
 
 type ApiUserItemItem = {
   id: string;
-  brand: string;
+  brand: string | null;
   name: string;
   category_id: string;
   category_name: string | null;
@@ -22,10 +22,15 @@ type GetUserItemsResponse = {
   user_items: ApiUserItem[];
 };
 
+type CreateUserItemResponse = {
+  id: string;
+  item_id: string;
+};
+
 const toItem = (apiItem: ApiUserItemItem): Item => {
   return {
     id: apiItem.id,
-    brand: apiItem.brand,
+    brand: apiItem.brand ?? "",
     name: apiItem.name,
     category: {
       id: apiItem.category_id,
@@ -57,18 +62,25 @@ export const getMyUserItems = async (): Promise<UserItem[]> => {
   return response.user_items.map(toUserItem);
 };
 
-/**
- * 今回の実API接続対象外。
- * POST /api/user_items が対象になったタイミングで実装する。
- */
-export const createUserItem = async (itemId: string): Promise<UserItem> => {
+export const createUserItem = async (
+  itemId: string,
+): Promise<CreateUserItemResponse> => {
   if (USE_MOCK_API) {
-    const foundUserItem = mockUserItems.find(
-      (userItem) => userItem.item.id === itemId,
-    );
-
-    return foundUserItem ?? mockUserItems[0];
+    return {
+      id: `mock-user-item-${itemId}`,
+      item_id: itemId,
+    };
   }
 
-  throw new Error("アイテム登録APIは今回の実API接続対象外です。");
+  return apiClient.post<CreateUserItemResponse>("/api/user_items", {
+    item_id: itemId,
+  });
+};
+
+export const deleteUserItem = async (userItemId: string): Promise<void> => {
+  if (USE_MOCK_API) {
+    return;
+  }
+
+  await apiClient.delete(`/api/user_items/${userItemId}`);
 };
