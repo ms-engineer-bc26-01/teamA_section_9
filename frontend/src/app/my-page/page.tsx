@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getMyProfile, updateMyProfile } from "@/api/profiles";
-import { getMyUserItems } from "@/api/userItems";
+import { deleteUserItem, getMyUserItems } from "@/api/userItems";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
 import { Loading } from "@/components/common/Loading";
 import { AppShell } from "@/components/layout/AppShell";
@@ -38,8 +38,17 @@ export default function MyPage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [isItemRegisterModalOpen, setIsItemRegisterModalOpen] = useState(false);
   const [isProfileEditModalOpen, setIsProfileEditModalOpen] = useState(false);
+
+  const showSuccessMessage = (message: string) => {
+    setSuccessMessage(message);
+
+    window.setTimeout(() => {
+      setSuccessMessage("");
+    }, 1800);
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -75,14 +84,31 @@ export default function MyPage() {
 
   const handleRegistered = async () => {
     try {
-      const data = await fetchMyPageData();
+      const latestUserItems = await getMyUserItems();
 
-      setProfile(data.profile);
-      setUserItems(data.userItems);
+      setUserItems(latestUserItems);
       setErrorMessage("");
     } catch (error) {
       console.error(error);
-      setErrorMessage("マイページ情報の再取得に失敗しました。");
+      setErrorMessage("登録済みアイテムの再取得に失敗しました。");
+    }
+  };
+
+  const handleDeleteUserItem = async (userItem: UserItem) => {
+    try {
+      await deleteUserItem(userItem.id);
+
+      setUserItems((currentUserItems) =>
+        currentUserItems.filter(
+          (currentUserItem) => currentUserItem.id !== userItem.id,
+        ),
+      );
+
+      setErrorMessage("");
+      showSuccessMessage("アイテムを削除しました。");
+    } catch (error) {
+      console.error(error);
+      setErrorMessage("所有アイテムの削除に失敗しました。");
     }
   };
 
@@ -96,6 +122,7 @@ export default function MyPage() {
 
       setProfile(savedProfile);
       setErrorMessage("");
+      showSuccessMessage("プロフィールを保存しました。");
     } catch (error) {
       console.error(error);
       setErrorMessage("プロフィールの保存に失敗しました。");
@@ -125,20 +152,41 @@ export default function MyPage() {
             <ErrorMessage message={errorMessage} />
           )}
 
-          {!isLoading && !errorMessage && profile && (
+          {!isLoading && profile && (
             <>
               <ProfileCard
                 profile={profile}
                 onClickEdit={() => setIsProfileEditModalOpen(true)}
               />
 
-              <UserItemList userItems={userItems} />
+              <UserItemList
+                userItems={userItems}
+                onDelete={handleDeleteUserItem}
+              />
 
               <LogoutButton onClick={handleLogout} />
             </>
           )}
         </section>
       </AppShell>
+
+      {successMessage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 px-4">
+          <div className="w-full max-w-xs rounded-3xl bg-white px-6 py-5 text-center shadow-xl">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-rose-50 text-xl">
+              ✓
+            </div>
+
+            <p className="mt-3 text-sm font-bold text-gray-800">
+              {successMessage}
+            </p>
+
+            <p className="mt-1 text-[11px] text-gray-500">
+              所有アイテム一覧に反映しました。
+            </p>
+          </div>
+        </div>
+      )}
 
       <ItemRegisterModal
         isOpen={isItemRegisterModalOpen}
