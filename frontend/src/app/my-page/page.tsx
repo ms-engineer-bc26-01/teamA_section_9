@@ -6,10 +6,8 @@ import { deleteUserItem, getMyUserItems } from "@/api/userItems";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
 import { Loading } from "@/components/common/Loading";
 import { AppShell } from "@/components/layout/AppShell";
-import { ItemRegisterModal } from "@/features/items/components/ItemRegisterModal";
 import { LogoutButton } from "@/features/my-page/components/LogoutButton";
 import { MyPageHeader } from "@/features/my-page/components/MyPageHeader";
-import { MyPageHeaderActions } from "@/features/my-page/components/MyPageHeaderActions";
 import { ProfileCard } from "@/features/my-page/components/ProfileCard";
 import { ProfileEditModal } from "@/features/my-page/components/ProfileEditModal";
 import { UserItemList } from "@/features/my-page/components/UserItemList";
@@ -39,7 +37,6 @@ export default function MyPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-  const [isItemRegisterModalOpen, setIsItemRegisterModalOpen] = useState(false);
   const [isProfileEditModalOpen, setIsProfileEditModalOpen] = useState(false);
 
   const showSuccessMessage = (message: string) => {
@@ -135,14 +132,7 @@ export default function MyPage() {
 
   return (
     <>
-      <AppShell
-        title="SkinMate"
-        headerRightContent={
-          <MyPageHeaderActions
-            onClickAddItem={() => setIsItemRegisterModalOpen(true)}
-          />
-        }
-      >
+      <AppShell title="SkinMate" onItemRegistered={handleRegistered}>
         <section className="space-y-4">
           <MyPageHeader />
 
@@ -187,12 +177,6 @@ export default function MyPage() {
           </div>
         </div>
       )}
-
-      <ItemRegisterModal
-        isOpen={isItemRegisterModalOpen}
-        onClose={() => setIsItemRegisterModalOpen(false)}
-        onRegistered={handleRegistered}
-      />
 
       {profile && (
         <ProfileEditModal

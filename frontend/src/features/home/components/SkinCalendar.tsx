@@ -11,20 +11,20 @@ export const SkinCalendar = ({ dailyLogs }: SkinCalendarProps) => {
   const calendarDays = createWeeklyCalendarDays(dailyLogs);
 
   return (
-    <section className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-      <div className="mb-4 flex items-center justify-between gap-3">
+    <section className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
+      <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-sm font-bold text-gray-700">スキンカレンダー</h2>
 
-        <div className="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-xs font-bold text-gray-600 shadow-sm">
+        <div className="rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] font-bold text-gray-600 shadow-sm">
           直近1週間
         </div>
       </div>
 
-      <div className="hide-scroll flex gap-2 overflow-x-auto pb-1">
+      <div className="grid grid-cols-7 gap-1">
         {calendarDays.map((calendarDay) => (
           <div
             key={calendarDay.date}
-            className="flex w-12 shrink-0 flex-col items-center rounded-xl border border-gray-100 bg-gray-50 px-2 py-2"
+            className="flex min-w-0 flex-col items-center rounded-xl border border-gray-100 bg-gray-50 px-1 py-2"
           >
             <span
               className={cn(
@@ -38,7 +38,7 @@ export const SkinCalendar = ({ dailyLogs }: SkinCalendarProps) => {
               {calendarDay.dayOfWeek}
             </span>
 
-            <span className="mb-2 text-sm font-bold text-gray-700">
+            <span className="mb-1.5 text-xs font-bold text-gray-700">
               {calendarDay.day}
             </span>
 
@@ -47,7 +47,7 @@ export const SkinCalendar = ({ dailyLogs }: SkinCalendarProps) => {
         ))}
       </div>
 
-      <p className="mt-3 text-[10px] leading-relaxed text-gray-400">
+      <p className="mt-2 text-[10px] leading-relaxed text-gray-400">
         😆 良好 / ☺️ 普通 / 😢 不調 / - 未記録
       </p>
     </section>
