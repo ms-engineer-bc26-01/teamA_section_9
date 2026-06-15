@@ -1,18 +1,18 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getMyProfile, updateMyProfile } from "@/api/profiles";
 import { deleteUserItem, getMyUserItems } from "@/api/userItems";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
 import { Loading } from "@/components/common/Loading";
 import { AppShell } from "@/components/layout/AppShell";
-import { ItemRegisterModal } from "@/features/items/components/ItemRegisterModal";
 import { LogoutButton } from "@/features/my-page/components/LogoutButton";
 import { MyPageHeader } from "@/features/my-page/components/MyPageHeader";
-import { MyPageHeaderActions } from "@/features/my-page/components/MyPageHeaderActions";
 import { ProfileCard } from "@/features/my-page/components/ProfileCard";
 import { ProfileEditModal } from "@/features/my-page/components/ProfileEditModal";
 import { UserItemList } from "@/features/my-page/components/UserItemList";
+import { authClient } from "@/lib/authClient";
 import type { Profile, UserItem } from "@/types/models";
 
 type MyPageData = {
@@ -33,13 +33,14 @@ const fetchMyPageData = async (): Promise<MyPageData> => {
 };
 
 export default function MyPage() {
+  const router = useRouter();
+
   const [profile, setProfile] = useState<Profile | null>(null);
   const [userItems, setUserItems] = useState<UserItem[]>([]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-  const [isItemRegisterModalOpen, setIsItemRegisterModalOpen] = useState(false);
   const [isProfileEditModalOpen, setIsProfileEditModalOpen] = useState(false);
 
   const showSuccessMessage = (message: string) => {
@@ -129,20 +130,22 @@ export default function MyPage() {
     }
   };
 
-  const handleLogout = () => {
-    alert("ログアウト処理は後続PRで実装予定です。");
+  const handleLogout = async () => {
+    try {
+      await authClient.logout();
+
+      router.replace("/login");
+    } catch (error) {
+      console.error(error);
+      setErrorMessage(
+        "ログアウトに失敗しました。時間をおいて再度お試しください。",
+      );
+    }
   };
 
   return (
     <>
-      <AppShell
-        title="SkinMate"
-        headerRightContent={
-          <MyPageHeaderActions
-            onClickAddItem={() => setIsItemRegisterModalOpen(true)}
-          />
-        }
-      >
+      <AppShell title="SkinMate" onItemRegistered={handleRegistered}>
         <section className="space-y-4">
           <MyPageHeader />
 
@@ -187,12 +190,6 @@ export default function MyPage() {
           </div>
         </div>
       )}
-
-      <ItemRegisterModal
-        isOpen={isItemRegisterModalOpen}
-        onClose={() => setIsItemRegisterModalOpen(false)}
-        onRegistered={handleRegistered}
-      />
 
       {profile && (
         <ProfileEditModal

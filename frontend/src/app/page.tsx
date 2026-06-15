@@ -10,7 +10,6 @@ import { ErrorMessage } from "@/components/common/ErrorMessage";
 import { Loading } from "@/components/common/Loading";
 import { AppShell } from "@/components/layout/AppShell";
 import { AiSuggestionCard } from "@/features/home/components/AiSuggestionCard";
-import { HomeHeaderActions } from "@/features/home/components/HomeHeaderActions";
 import { SkinCalendar } from "@/features/home/components/SkinCalendar";
 import type { AiSuggestion, DailyLog } from "@/types/models";
 
@@ -144,18 +143,9 @@ export default function HomePage() {
     void generatePendingHomeSummary();
   }, []);
 
-  const handleClickAddItem = () => {
-    alert("アイテム登録APIは後続PRで接続予定です。");
-  };
-
   return (
-    <AppShell
-      title="SkinMate"
-      headerRightContent={
-        <HomeHeaderActions onClickAddItem={handleClickAddItem} />
-      }
-    >
-      <section className="space-y-5">
+    <AppShell title="SkinMate">
+      <section className="space-y-4">
         {isLoading && <Loading text="ホーム画面を読み込み中..." />}
 
         {!isLoading && errorMessage && <ErrorMessage message={errorMessage} />}
