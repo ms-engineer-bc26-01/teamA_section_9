@@ -60,26 +60,38 @@ export const LifestyleFields = ({
       <h2 className="text-base font-bold text-gray-800">ライフスタイル</h2>
 
       <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 shadow-sm">
-        <div className="mb-4 flex items-start gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-xs text-rose-500 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-sm text-rose-500 shadow-sm">
             ♡
           </div>
 
-          <div>
+          <div className="min-w-0 flex-1">
             <h3 className="text-xs font-bold text-gray-800">コンディション</h3>
+
+            <p className="mt-1 whitespace-nowrap text-sm font-bold text-rose-500">
+              {isMenstruation ? "生理中です" : "生理中ではありません"}
+            </p>
+
             <p className="mt-1 text-[11px] text-gray-500">
-              {isMenstruation ? "現在は生理期間中です" : "現在は生理期間外です"}
+              {isMenstruation
+                ? "無理せず、肌と体調の変化をメモしておきましょう"
+                : "生理がきたら、ここから切り替えできます"}
             </p>
           </div>
-        </div>
 
-        <button
-          type="button"
-          onClick={() => onChange({ isMenstruation: !isMenstruation })}
-          className="w-full rounded-2xl bg-rose-400 px-4 py-3 text-xs font-bold text-white shadow-sm transition hover:bg-rose-500"
-        >
-          {isMenstruation ? "生理がおわった" : "＋ 生理がきた"}
-        </button>
+          <button
+            type="button"
+            onClick={() => onChange({ isMenstruation: !isMenstruation })}
+            className={cn(
+              "shrink-0 rounded-full border px-3 py-1.5 text-[11px] font-bold shadow-sm transition",
+              isMenstruation
+                ? "border-rose-400 bg-white text-rose-500 hover:bg-rose-50"
+                : "border-rose-400 bg-rose-400 text-white hover:bg-rose-500",
+            )}
+          >
+            {isMenstruation ? "生理が終わった" : "生理がきた"}
+          </button>
+        </div>
       </div>
 
       <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
