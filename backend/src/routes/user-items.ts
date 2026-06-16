@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { prisma } from "../lib/prisma.js";
 import { getFirebaseUid } from "../lib/auth.js";
+import { unauthorized, internalError } from "../lib/errors.js";
 
 const app = new Hono();
 
@@ -8,7 +9,7 @@ const app = new Hono();
 app.get("/", async (c) => {
   const userId = await getFirebaseUid(c);
   if (!userId) {
-    return c.json({ error: "Unauthorized: トークンが無効です" }, 401);
+    return unauthorized(c);
   }
 
   // user_itemsを取得し、関連するitem(とそのカテゴリ)も一緒に取る
@@ -46,7 +47,7 @@ app.post("/", async (c) => {
   // --- 認証(他のエンドポイントと統一) ---
   const userId = await getFirebaseUid(c);
   if (!userId) {
-    return c.json({ error: "Unauthorized: トークンが無効です" }, 401);
+    return unauthorized(c);
   }
 
   // --- ボディ取得 ---
@@ -101,7 +102,7 @@ app.post("/", async (c) => {
     return c.json({ id: created.id, item_id: created.item_id }, 201);
   } catch (error) {
     console.error("手持ちアイテム追加エラー:", error);
-    return c.json({ error: "Internal Server Error: 登録に失敗しました" }, 500);
+    return internalError(c, "登録に失敗しました");
   }
 });
 
@@ -111,7 +112,7 @@ app.delete("/:id", async (c) => {
   // --- 認証(他のエンドポイントと統一) ---
   const userId = await getFirebaseUid(c);
   if (!userId) {
-    return c.json({ error: "Unauthorized: トークンが無効です" }, 401);
+    return unauthorized(c);
   }
 
   const id = c.req.param("id");
@@ -134,7 +135,7 @@ app.delete("/:id", async (c) => {
     return c.body(null, 204);
   } catch (error) {
     console.error("手持ちアイテム削除エラー:", error);
-    return c.json({ error: "Internal Server Error: 削除に失敗しました" }, 500);
+    return internalError(c, "削除に失敗しました");
   }
 });
 

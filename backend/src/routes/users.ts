@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { prisma } from "../lib/prisma.js";
 import { adminAuth } from "../config/firebase.js";
+import { unauthorized, badRequest, internalError } from "../lib/errors.js";
 
 const app = new Hono();
 
@@ -9,7 +10,7 @@ app.get("/me", async (c) => {
   // 1. リクエストの Authorization ヘッダーから IDトークンを取得
   const authHeader = c.req.header("Authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return c.json({ error: "Unauthorized: トークンがありません" }, 401);
+    return unauthorized(c, "トークンがありません");
   }
 
   const idToken = authHeader.split("Bearer ")[1];
@@ -57,7 +58,7 @@ app.get("/me", async (c) => {
     );
   } catch (error) {
     console.error("認証エラー:", error);
-    return c.json({ error: "Unauthorized: トークンの検証に失敗しました" }, 401);
+    return unauthorized(c, "トークンの検証に失敗しました");
   }
 });
 
@@ -66,7 +67,7 @@ app.patch("/me", async (c) => {
   // --- 認証(GET /me と同じインライン方式) ---
   const authHeader = c.req.header("Authorization");
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return c.json({ error: "Unauthorized: トークンがありません" }, 401);
+    return unauthorized(c, "トークンがありません");
   }
   const idToken = authHeader.split("Bearer ")[1];
 
@@ -76,7 +77,7 @@ app.patch("/me", async (c) => {
     firebaseUid = decodedToken.uid;
   } catch (error) {
     console.error("認証エラー:", error);
-    return c.json({ error: "Unauthorized: トークンの検証に失敗しました" }, 401);
+    return unauthorized(c, "トークンの検証に失敗しました");
   }
 
   // --- ボディ取得 ---
@@ -88,7 +89,7 @@ app.patch("/me", async (c) => {
   try {
     body = await c.req.json();
   } catch {
-    return c.json({ error: "Bad Request: JSONボディが不正です" }, 400);
+    return badRequest(c, "JSONボディが不正です");
   }
 
   // --- 送られてきた項目だけ更新データに詰める(部分更新) ---
@@ -105,12 +106,7 @@ app.patch("/me", async (c) => {
     } else {
       const d = new Date(body.birth_day);
       if (isNaN(d.getTime())) {
-        return c.json(
-          {
-            error: "Bad Request: birth_day は YYYY-MM-DD 形式で送ってください",
-          },
-          400,
-        );
+        return badRequest(c, "birth_day は YYYY-MM-DD 形式で送ってください");
       }
       data.birth_day = d;
     }
@@ -139,7 +135,7 @@ app.patch("/me", async (c) => {
     );
   } catch (error) {
     console.error("プロフィール更新エラー:", error);
-    return c.json({ error: "Internal Server Error: 更新に失敗しました" }, 500);
+    return internalError(c, "更新に失敗しました");
   }
 });
 

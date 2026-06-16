@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import OpenAI from "openai";
 import { prisma } from "../lib/prisma.js";
 import { getFirebaseUid } from "../lib/auth.js";
+import { unauthorized } from "../lib/errors.js";
 
 const app = new Hono();
 
@@ -12,7 +13,7 @@ const openai = new OpenAI();
 app.get("/", async (c) => {
   const userId = await getFirebaseUid(c);
   if (!userId) {
-    return c.json({ error: "Unauthorized: トークンが無効です" }, 401);
+    return unauthorized(c);
   }
 
   const suggestionType = c.req.query("suggestion_type");
@@ -42,7 +43,7 @@ app.get("/", async (c) => {
 app.post("/", async (c) => {
   const userId = await getFirebaseUid(c);
   if (!userId) {
-    return c.json({ error: "Unauthorized: トークンが無効です" }, 401);
+    return unauthorized(c);
   }
 
   const body = await c.req.json();

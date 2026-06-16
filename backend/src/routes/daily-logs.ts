@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { prisma } from "../lib/prisma.js";
 import { getFirebaseUid } from "../lib/auth.js";
+import { unauthorized } from "../lib/errors.js";
 
 const app = new Hono();
 
@@ -8,7 +9,7 @@ const app = new Hono();
 app.get("/", async (c) => {
   const userId = await getFirebaseUid(c);
   if (!userId) {
-    return c.json({ error: "Unauthorized: トークンが無効です" }, 401);
+    return unauthorized(c);
   }
 
   const startDate = c.req.query("start_date");
@@ -43,7 +44,7 @@ app.get("/", async (c) => {
 app.get("/:log_date", async (c) => {
   const userId = await getFirebaseUid(c);
   if (!userId) {
-    return c.json({ error: "Unauthorized: トークンが無効です" }, 401);
+    return unauthorized(c);
   }
 
   const logDate = c.req.param("log_date");
@@ -106,7 +107,7 @@ app.get("/:log_date", async (c) => {
 app.post("/", async (c) => {
   const userId = await getFirebaseUid(c);
   if (!userId) {
-    return c.json({ error: "Unauthorized: トークンが無効です" }, 401);
+    return unauthorized(c);
   }
 
   const body = await c.req.json();
@@ -212,7 +213,7 @@ app.post("/", async (c) => {
 app.patch("/:id", async (c) => {
   const userId = await getFirebaseUid(c);
   if (!userId) {
-    return c.json({ error: "Unauthorized: トークンが無効です" }, 401);
+    return unauthorized(c);
   }
 
   const id = c.req.param("id");

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { prisma } from "../lib/prisma.js";
 import { getFirebaseUid } from "../lib/auth.js";
+import { unauthorized, internalError } from "../lib/errors.js";
 
 const app = new Hono();
 
@@ -11,7 +12,7 @@ app.get("/", async (c) => {
   // --- 認証(他のGETと統一) ---
   const userId = await getFirebaseUid(c);
   if (!userId) {
-    return c.json({ error: "Unauthorized: トークンが無効です" }, 401);
+     return unauthorized(c);
   }
 
   const q = c.req.query("q")?.trim();
@@ -57,7 +58,7 @@ app.get("/", async (c) => {
     });
   } catch (error) {
     console.error("マスタ検索エラー:", error);
-    return c.json({ error: "Internal Server Error: 検索に失敗しました" }, 500);
+    return internalError(c, "検索に失敗しました");
   }
 });
 
