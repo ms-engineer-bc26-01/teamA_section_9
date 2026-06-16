@@ -1,7 +1,7 @@
-import { Hono } from "hono";
+﻿import { Hono } from "hono";
 import { prisma } from "../lib/prisma.js";
 import { getFirebaseUid } from "../lib/auth.js";
-import { unauthorized } from "../lib/errors.js";
+import { unauthorized, badRequest, notFound } from "../lib/errors.js";
 
 const app = new Hono();
 
@@ -16,10 +16,7 @@ app.get("/", async (c) => {
   const endDate = c.req.query("end_date");
 
   if (!startDate || !endDate) {
-    return c.json(
-      { error: "BAD_REQUEST", message: "start_date と end_date は必須です" },
-      400
-    );
+    return badRequest(c, "start_date と end_date は必須です");
   }
 
   const logs = await prisma.daily_logs.findMany({
@@ -115,16 +112,10 @@ app.post("/", async (c) => {
   // --- 1. 入力チェック(必須項目) ---
   const { log_date, skin_condition, isMenstruation } = body;
   if (!log_date || !skin_condition || typeof isMenstruation !== "boolean") {
-    return c.json(
-      { error: "BAD_REQUEST", message: "log_date, skin_condition, isMenstruation は必須です" },
-      400
-    );
+    return badRequest(c, "log_date, skin_condition, isMenstruation は必須です");
   }
   if (![1, 2, 3].includes(skin_condition)) {
-    return c.json(
-      { error: "BAD_REQUEST", message: "skin_condition は 1〜3 で指定してください" },
-      400
-    );
+    return badRequest(c, "skin_condition は 1〜3 で指定してください");
   }
 
   // --- 2. 肌記録を保存(同じユーザー×日付があれば更新、なければ作成) ---
@@ -231,10 +222,7 @@ app.patch("/:id", async (c) => {
 
   if (body.skin_condition !== undefined) {
     if (![1, 2, 3].includes(body.skin_condition)) {
-      return c.json(
-        { error: "BAD_REQUEST", message: "skin_condition は 1〜3 で指定してください" },
-        400
-      );
+      return badRequest(c, "skin_condition は 1〜3 で指定してください");
     }
     data.skin_condition = body.skin_condition;
   }
@@ -244,10 +232,7 @@ app.patch("/:id", async (c) => {
   if (body.free_note !== undefined) data.free_note = body.free_note ?? null;
   if (body.isMenstruation !== undefined) {
     if (typeof body.isMenstruation !== "boolean") {
-      return c.json(
-        { error: "BAD_REQUEST", message: "isMenstruation は true/false で指定してください" },
-        400
-      );
+      return badRequest(c, "isMenstruation は true/false で指定してください");
     }
     data.isMenstruation = body.isMenstruation;
   }
@@ -259,10 +244,7 @@ app.patch("/:id", async (c) => {
 
   // 基本項目も使用アイテムも一つも無ければ400
   if (Object.keys(data).length === 0 && !hasUsedItems) {
-    return c.json(
-      { error: "BAD_REQUEST", message: "更新する項目がありません" },
-      400
-    );
+    return badRequest(c, "更新する項目がありません");
   }
 
   // --- 3. 本人の記録か確認(所有チェック)。無ければ404 ---
@@ -270,10 +252,7 @@ app.patch("/:id", async (c) => {
     where: { id, user_id: userId },
   });
   if (!existing) {
-    return c.json(
-      { error: "NOT_FOUND", message: "指定の肌記録が見つかりません" },
-      404
-    );
+    return notFound(c, "指定の肌記録が見つかりません");
   }
 
   // --- 4. 基本項目を更新(更新するものがあれば) ---

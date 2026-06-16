@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import OpenAI from "openai";
 import { prisma } from "../lib/prisma.js";
 import { getFirebaseUid } from "../lib/auth.js";
-import { unauthorized } from "../lib/errors.js";
+import { unauthorized, badRequest } from "../lib/errors.js";
 
 const app = new Hono();
 
@@ -50,14 +50,7 @@ app.post("/", async (c) => {
   const suggestionType = body.suggestion_type;
 
   if (!["home_summary", "daily_comment"].includes(suggestionType)) {
-    return c.json(
-      {
-        error: "BAD_REQUEST",
-        message:
-          "suggestion_type は home_summary か daily_comment を指定してください",
-      },
-      400,
-    );
+    return badRequest(c, "suggestion_type は home_summary か daily_comment を指定してください");
   }
 
   // --- 第1幕: 材料集め ---

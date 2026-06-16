@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { prisma } from "../lib/prisma.js";
 import { getFirebaseUid } from "../lib/auth.js";
-import { unauthorized, internalError } from "../lib/errors.js";
+import { errorResponse, unauthorized, badRequest, notFound, conflict, internalError } from "../lib/errors.js";
 
 const app = new Hono();
 
@@ -55,22 +55,19 @@ app.post("/", async (c) => {
   try {
     body = await c.req.json();
   } catch {
-    return c.json({ error: "BAD_REQUEST", message: "リクエストボディが不正です" }, 400);
+    return badRequest(c, "リクエストボディが不正です");
   }
 
   const itemId = body.item_id;
   if (!itemId) {
-    return c.json({ error: "BAD_REQUEST", message: "item_id は必須です" }, 400);
+    return badRequest(c, "item_id は必須です");
   }
 
   try {
     // --- 1. 指定アイテムがマスタに存在するか確認 ---
     const item = await prisma.items.findUnique({ where: { id: itemId } });
     if (!item) {
-      return c.json(
-        { error: "NOT_FOUND", message: "指定されたアイテムが存在しません" },
-        404
-      );
+      return notFound(c, "指定されたアイテムが存在しません");
     }
 
     // --- 2. すでに手持ち登録済みか確認(重複防止) ---
@@ -78,19 +75,13 @@ app.post("/", async (c) => {
       where: { user_id: userId, item_id: itemId },
     });
     if (existing) {
-      return c.json(
-        { error: "ALREADY_EXISTS", message: "すでに手持ちアイテムとして登録済みです" },
-        409
-      );
+      return conflict(c, "ALREADY_EXISTS", "すでに手持ちアイテムとして登録済みです");
     }
 
     // --- 3. 上限10件チェック ---
     const count = await prisma.user_items.count({ where: { user_id: userId } });
     if (count >= 10) {
-      return c.json(
-        { error: "ITEM_LIMIT_EXCEEDED", message: "手持ちアイテムは10件までです" },
-        400
-      );
+      return errorResponse(c, 400, "ITEM_LIMIT_EXCEEDED", "手持ちアイテムは10件までです");
     }
 
     // --- 4. 登録 ---
@@ -125,10 +116,7 @@ app.delete("/:id", async (c) => {
     });
 
     if (result.count === 0) {
-      return c.json(
-        { error: "NOT_FOUND", message: "指定された手持ちアイテムが存在しません" },
-        404
-      );
+      return notFound(c, "指定された手持ちアイテムが存在しません");
     }
 
     // --- 成功: 204 No Content (ボディなし) ---
