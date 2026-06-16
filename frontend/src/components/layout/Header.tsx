@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { TermsModal } from "@/components/common/TermsModal";
 import { ItemRegisterModal } from "@/features/items/components/ItemRegisterModal";
 
 type HeaderProps = {
@@ -12,9 +13,6 @@ type HeaderProps = {
 const menuItemClassName =
   "block w-full appearance-none border-0 bg-transparent px-4 py-2.5 text-left font-sans text-gray-700 transition hover:bg-gray-50";
 
-const disabledMenuItemClassName =
-  "block w-full cursor-not-allowed appearance-none border-0 bg-transparent px-4 py-2.5 text-left font-sans text-gray-300";
-
 const menuItemTextClassName = "block !text-xs font-bold !leading-none";
 
 export const Header = ({ title, onItemRegistered }: HeaderProps) => {
@@ -22,6 +20,7 @@ export const Header = ({ title, onItemRegistered }: HeaderProps) => {
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isItemRegisterModalOpen, setIsItemRegisterModalOpen] = useState(false);
+  const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
 
   const closeMenu = () => {
     setIsMenuOpen(false);
@@ -35,6 +34,11 @@ export const Header = ({ title, onItemRegistered }: HeaderProps) => {
   const handleOpenItemRegisterModal = () => {
     closeMenu();
     setIsItemRegisterModalOpen(true);
+  };
+
+  const handleOpenTermsModal = () => {
+    closeMenu();
+    setIsTermsModalOpen(true);
   };
 
   return (
@@ -92,8 +96,8 @@ export const Header = ({ title, onItemRegistered }: HeaderProps) => {
 
                 <button
                   type="button"
-                  disabled
-                  className={disabledMenuItemClassName}
+                  onClick={handleOpenTermsModal}
+                  className={menuItemClassName}
                 >
                   <span className={menuItemTextClassName}>利用規約</span>
                 </button>
@@ -116,6 +120,11 @@ export const Header = ({ title, onItemRegistered }: HeaderProps) => {
         isOpen={isItemRegisterModalOpen}
         onClose={() => setIsItemRegisterModalOpen(false)}
         onRegistered={onItemRegistered}
+      />
+
+      <TermsModal
+        isOpen={isTermsModalOpen}
+        onClose={() => setIsTermsModalOpen(false)}
       />
     </>
   );
