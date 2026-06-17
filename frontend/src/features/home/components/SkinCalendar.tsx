@@ -1,7 +1,7 @@
-import type { DailyLog } from "@/types/models";
-import { createWeeklyCalendarDays } from "@/features/home/utils";
 import { SkinConditionBadge } from "@/features/home/components/SkinConditionBadge";
+import { createWeeklyCalendarDays } from "@/features/home/utils";
 import { cn } from "@/lib/utils";
+import type { DailyLog } from "@/types/models";
 
 type SkinCalendarProps = {
   dailyLogs: DailyLog[];
@@ -9,6 +9,7 @@ type SkinCalendarProps = {
 
 export const SkinCalendar = ({ dailyLogs }: SkinCalendarProps) => {
   const calendarDays = createWeeklyCalendarDays(dailyLogs);
+  const hasDailyLogs = dailyLogs.length > 0;
 
   return (
     <section className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
@@ -19,6 +20,18 @@ export const SkinCalendar = ({ dailyLogs }: SkinCalendarProps) => {
           直近1週間
         </div>
       </div>
+
+      {!hasDailyLogs && (
+        <div className="mb-3 rounded-xl border border-dashed border-rose-100 bg-rose-50 px-3 py-2">
+          <p className="text-xs font-bold text-rose-500">
+            まだ肌記録がありません
+          </p>
+
+          <p className="mt-1 text-[10px] leading-relaxed text-gray-500">
+            肌記録を保存すると、上の期間内の日付に肌状態アイコンが反映されます。
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-7 gap-1">
         {calendarDays.map((calendarDay) => (
