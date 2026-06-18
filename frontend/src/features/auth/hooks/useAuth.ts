@@ -27,11 +27,6 @@ export const useAuth = () => {
 
       // 2. バックエンド（Hono）の通信に使うための最新の「IDトークン」を取得
       const idToken = await user.getIdToken();
-
-      console.log("====== Firebase ログイン成功！ ======");
-      console.log("Firebase UID:", user.uid);
-      console.log("IDトークン:", idToken);
-
       return { user, idToken };
     } catch (err: unknown) {
       const errorMessage =
@@ -62,12 +57,6 @@ export const useAuth = () => {
       // 2. バックエンドに渡すための「IDトークン（JWT）」を発行してもらう
       const idToken = await user.getIdToken();
 
-      // 3. 【動作確認用】手元で確認できるようにトークンとUIDをコンソールに出す
-      console.log("====== Firebase 認証成功！ ======");
-      console.log("Firebase UID (これを最終的にDBに入れたい):", user.uid);
-      console.log("IDトークン (これをHonoに送る用):", idToken);
-
-      // 次のステップで、この idToken をバックエンドに POST する処理をここに書き足します！
       return { user, idToken };
     } catch (err: unknown) {
       const errorMessage =
