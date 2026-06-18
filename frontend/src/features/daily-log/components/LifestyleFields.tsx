@@ -3,8 +3,8 @@
 import { Select } from "@/components/common/Select";
 import { Textarea } from "@/components/common/Textarea";
 import { MEAL_BALANCE_OPTIONS, SLEEP_LEVEL_OPTIONS } from "@/lib/constants";
-import type { MealBalance, SleepLevel, Weather } from "@/types/models";
 import { cn } from "@/lib/utils";
+import type { MealBalance, SleepLevel, Weather } from "@/types/models";
 
 type LifestyleFieldsProps = {
   weather: Weather | "";
@@ -46,6 +46,15 @@ const weatherOptions: Array<{
     selectedClassName: "bg-white text-orange-500 shadow-sm",
   },
 ];
+
+const mealBalanceOrder = ["悪い", "普通", "良い"];
+
+const mealBalanceOptions = [...MEAL_BALANCE_OPTIONS].sort((a, b) => {
+  const aIndex = mealBalanceOrder.indexOf(a.label);
+  const bIndex = mealBalanceOrder.indexOf(b.label);
+
+  return (aIndex === -1 ? 999 : aIndex) - (bIndex === -1 ? 999 : bIndex);
+});
 
 export const LifestyleFields = ({
   weather,
@@ -142,7 +151,7 @@ export const LifestyleFields = ({
             label="食事のバランス"
             placeholder="選択"
             value={mealBalance}
-            options={[...MEAL_BALANCE_OPTIONS]}
+            options={mealBalanceOptions}
             onChange={(event) =>
               onChange({ mealBalance: event.target.value as MealBalance | "" })
             }
