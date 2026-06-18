@@ -7,6 +7,7 @@ import { deleteUserItem, getMyUserItems } from "@/api/userItems";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
 import { Loading } from "@/components/common/Loading";
 import { AppShell } from "@/components/layout/AppShell";
+import { ItemRegisterModal } from "@/features/items/components/ItemRegisterModal";
 import { LogoutButton } from "@/features/my-page/components/LogoutButton";
 import { MyPageHeader } from "@/features/my-page/components/MyPageHeader";
 import { ProfileCard } from "@/features/my-page/components/ProfileCard";
@@ -42,6 +43,7 @@ export default function MyPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isProfileEditModalOpen, setIsProfileEditModalOpen] = useState(false);
+  const [isItemRegisterModalOpen, setIsItemRegisterModalOpen] = useState(false);
 
   const showSuccessMessage = (message: string) => {
     setSuccessMessage(message);
@@ -165,6 +167,7 @@ export default function MyPage() {
               <UserItemList
                 userItems={userItems}
                 onDelete={handleDeleteUserItem}
+                onClickRegister={() => setIsItemRegisterModalOpen(true)}
               />
 
               <LogoutButton onClick={handleLogout} />
@@ -172,6 +175,12 @@ export default function MyPage() {
           )}
         </section>
       </AppShell>
+
+      <ItemRegisterModal
+        isOpen={isItemRegisterModalOpen}
+        onClose={() => setIsItemRegisterModalOpen(false)}
+        onRegistered={handleRegistered}
+      />
 
       {successMessage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 px-4">
