@@ -2,8 +2,8 @@
 
 import { FormEvent, useState } from "react";
 import { Button } from "@/components/common/Button";
-import { Input } from "@/components/common/Input";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
+import { Input } from "@/components/common/Input";
 import { TermsModal } from "@/components/common/TermsModal";
 import { SkinTypeSelector } from "@/features/auth/components/SkinTypeSelector";
 import type { RegisterFormValues } from "@/features/auth/types";
@@ -12,6 +12,49 @@ type RegisterFormProps = {
   onSubmit: (values: RegisterFormValues) => Promise<void>;
   onClickLogin: () => void;
   isSubmitting?: boolean;
+};
+
+const getFirebaseErrorCode = (error: unknown) => {
+  if (typeof error === "object" && error !== null && "code" in error) {
+    const code = (error as { code?: unknown }).code;
+
+    if (typeof code === "string") {
+      return code;
+    }
+  }
+
+  if (error instanceof Error) {
+    const matchedCode = error.message.match(/auth\/[a-z0-9-]+/i)?.[0];
+
+    return matchedCode;
+  }
+
+  return undefined;
+};
+
+const getRegisterErrorMessage = (error: unknown) => {
+  const code = getFirebaseErrorCode(error);
+
+  switch (code) {
+    case "auth/email-already-in-use":
+      return "このメールアドレスはすでに登録されています。ログイン画面からログインしてください。";
+
+    case "auth/invalid-email":
+      return "メールアドレスの形式が正しくありません。入力内容を確認してください。";
+
+    case "auth/weak-password":
+      return "パスワードは8文字以上で入力してください。";
+
+    case "auth/network-request-failed":
+      return "通信に失敗しました。通信環境を確認して再度お試しください。";
+
+    default:
+      if (error instanceof Error && error.message) {
+        return error.message;
+      }
+
+      return "新規登録に失敗しました。入力内容を確認して再度お試しください。";
+  }
 };
 
 export const RegisterForm = ({
@@ -68,7 +111,7 @@ export const RegisterForm = ({
       await onSubmit(values);
     } catch (error) {
       console.error(error);
-      setErrorMessage("新規登録に失敗しました。");
+      setErrorMessage(getRegisterErrorMessage(error));
     } finally {
       setInternalIsSubmitting(false);
     }

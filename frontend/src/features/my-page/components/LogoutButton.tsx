@@ -12,10 +12,6 @@ export const LogoutButton = ({ onClick }: LogoutButtonProps) => {
       <Button variant="secondary" fullWidth onClick={onClick}>
         ログアウト
       </Button>
-
-      <p className="mt-3 text-center text-[10px] leading-relaxed text-gray-400">
-        Firebase認証の本実装後、ログアウト処理を接続予定です。
-      </p>
     </section>
   );
 };

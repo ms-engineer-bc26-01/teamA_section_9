@@ -101,6 +101,14 @@ export const Header = ({ title, onItemRegistered }: HeaderProps) => {
                 >
                   <span className={menuItemTextClassName}>利用規約</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleNavigate("/contact")}
+                  className={menuItemClassName}
+                >
+                  <span className={menuItemTextClassName}>お問い合わせ</span>
+                </button>
               </div>
             )}
           </div>

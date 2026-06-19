@@ -21,10 +21,10 @@ export const BaseModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-4 pb-4 sm:items-center sm:pb-0">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-4">
       <div
         className={cn(
-          "w-full max-w-sm rounded-3xl bg-white p-5 shadow-xl",
+          "max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-3xl bg-white p-5 shadow-xl",
           className,
         )}
       >
