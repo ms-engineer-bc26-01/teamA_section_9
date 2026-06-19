@@ -1,17 +1,52 @@
-import { EmptyState } from "@/components/common/EmptyState";
+import Link from "next/link";
 import type { AiSuggestion } from "@/types/models";
 
 type AiSuggestionCardProps = {
   suggestion: AiSuggestion | null;
 };
 
+const AI_DISCLAIMER_TEXT =
+  "※本提案は医療行為ではありません。肌トラブルが続く場合は皮膚科専門医へご相談ください。";
+
 export const AiSuggestionCard = ({ suggestion }: AiSuggestionCardProps) => {
   if (!suggestion) {
     return (
-      <EmptyState
-        title="AI提案がありません"
-        description="記録を追加すると、肌状態に合わせた提案が表示されます。"
-      />
+      <section className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+        <div className="flex items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-rose-50 text-base">
+            🫧
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="rounded-md bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-600">
+                AI分析
+              </span>
+
+              <p className="text-sm font-bold text-gray-800">
+                まだAI提案がありません
+              </p>
+            </div>
+
+            <p className="mt-2 text-xs leading-relaxed text-gray-500">
+              肌記録を保存すると、今日の振り返りコメントやスキンケアのヒントが表示されます。
+            </p>
+
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <p className="text-[10px] leading-relaxed text-rose-500">
+                {AI_DISCLAIMER_TEXT}
+              </p>
+
+              <Link
+                href="/record"
+                className="shrink-0 rounded-full bg-rose-500 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-rose-600"
+              >
+                記録する
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
     );
   }
 
@@ -25,6 +60,7 @@ export const AiSuggestionCard = ({ suggestion }: AiSuggestionCardProps) => {
             <span className="rounded-md bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-600">
               AI分析
             </span>
+
             <h2 className="text-sm font-bold text-gray-800">
               {suggestion.title}
             </h2>
@@ -41,25 +77,24 @@ export const AiSuggestionCard = ({ suggestion }: AiSuggestionCardProps) => {
               <p className="text-xs font-black tracking-wider text-rose-400 uppercase">
                 🫧 おすすめのセット 🫧
               </p>
-              
+
               {suggestion.basis.includes(" × ") ? (
                 <div className="mt-3 flex flex-col items-center justify-center text-[11px] font-medium text-gray-700">
-                  
-                  {/* 商品名A */}
-                  <span className="leading-tight px-2">
+                  <span className="px-2 leading-tight">
                     {suggestion.basis.split(" × ")[0]}
                   </span>
 
-                  <div className="flex items-center gap-1.5 my-1">
+                  <div className="my-1 flex items-center gap-1.5">
                     <div className="h-[1px] w-15 bg-rose-100" />
-                    <span className="text-[14px] font-bold text-rose-300 font-sans leading-none">
+
+                    <span className="font-sans text-[14px] font-bold leading-none text-rose-300">
                       ×
                     </span>
+
                     <div className="h-[1px] w-15 bg-rose-100" />
                   </div>
 
-                  {/* 商品名B */}
-                  <span className="leading-tight px-2">
+                  <span className="px-2 leading-tight">
                     {suggestion.basis.split(" × ")[1]}
                   </span>
                 </div>
@@ -70,6 +105,10 @@ export const AiSuggestionCard = ({ suggestion }: AiSuggestionCardProps) => {
               )}
             </div>
           )}
+
+          <p className="mt-4 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-[10px] leading-relaxed text-rose-500">
+            {AI_DISCLAIMER_TEXT}
+          </p>
         </div>
       </div>
     </section>

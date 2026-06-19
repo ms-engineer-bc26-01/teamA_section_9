@@ -8,6 +8,7 @@ import type { UserItem } from "@/types/models";
 type UserItemListProps = {
   userItems: UserItem[];
   onDelete?: (userItem: UserItem) => void | Promise<void>;
+  onClickRegister?: () => void;
 };
 
 const ALL_CATEGORY = "すべて";
@@ -24,7 +25,11 @@ const getCategoryIcon = (categoryName: string) => {
   return iconMap[categoryName] ?? "🧴";
 };
 
-export const UserItemList = ({ userItems, onDelete }: UserItemListProps) => {
+export const UserItemList = ({
+  userItems,
+  onDelete,
+  onClickRegister,
+}: UserItemListProps) => {
   const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORY);
   const [deletingUserItemId, setDeletingUserItemId] = useState<string | null>(
     null,
@@ -78,6 +83,7 @@ export const UserItemList = ({ userItems, onDelete }: UserItemListProps) => {
       <section className="space-y-3">
         <div>
           <h2 className="text-base font-bold text-gray-800">所有アイテム</h2>
+
           <p className="mt-0.5 text-[11px] text-gray-500">
             現在登録数：{userItems.length}
           </p>
@@ -107,11 +113,15 @@ export const UserItemList = ({ userItems, onDelete }: UserItemListProps) => {
 
         {userItems.length === 0 ? (
           <EmptyState
-            title="手持ちアイテムがありません"
-            description="アイテム登録から、普段使っているコスメを追加してください。"
+            icon="🧴"
+            title="まだ登録済みアイテムがありません"
+            description="普段使っているスキンケアアイテムを登録すると、肌記録で使用アイテムとして選択できます。"
+            actionLabel="アイテム登録"
+            onAction={onClickRegister}
           />
         ) : filteredUserItems.length === 0 ? (
           <EmptyState
+            icon="🔍"
             title="該当するアイテムがありません"
             description="別のカテゴリを選択してください。"
           />

@@ -22,8 +22,6 @@ app.get("/me", async (c) => {
     // Firebase側に登録されている名前があれば取得（なければnull）
     const name = decodedToken.name || null;
 
-    console.log(`🔥 [Backend] Firebase トークン解読成功！ UID: ${firebaseUid}`);
-
     // 3. DB（profiles）に該当UIDがいるか探す
     let profile = await prisma.profiles.findUnique({
       where: { id: firebaseUid },
@@ -31,7 +29,7 @@ app.get("/me", async (c) => {
 
     // 4. DBにいなければ、その場で新規レコードを作成（未登録時は初期作成仕様）
     if (!profile) {
-      console.log(`✨ 新規ユーザーのためDBにプロフィールを作成します: ${name}`);
+      console.log(`✨ 新規ユーザーのためDBにプロフィールを作成します`);
       profile = await prisma.profiles.create({
         data: {
           id: firebaseUid,
@@ -39,7 +37,7 @@ app.get("/me", async (c) => {
         },
       });
     } else {
-      console.log(`👋 既存ユーザーのログインです: ${profile.name}`);
+      console.log(`👋 既存ユーザーのログインです`);
     }
 
     // 5. API設計書のUserスキーマの形で返す
@@ -119,7 +117,7 @@ app.patch("/me", async (c) => {
       update: data,
       create: { id: firebaseUid, ...data },
     });
-    console.log(`📝 プロフィール更新: ${profile.id}`);
+    console.log(`📝 プロフィール更新`);
     return c.json(
       {
         id: profile.id,
