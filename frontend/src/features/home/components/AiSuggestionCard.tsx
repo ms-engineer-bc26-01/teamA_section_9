@@ -8,6 +8,17 @@ type AiSuggestionCardProps = {
 const AI_DISCLAIMER_TEXT =
   "※本提案は医療行為ではありません。肌トラブルが続く場合は皮膚科専門医へご相談ください。";
 
+// SOSと判定するタイトルのキーワードリスト（systemPromptで指定しているタイトル）
+const SOS_TITLES = [
+  "専門医にご相談ください",
+  "医師へのご相談をお願いします",
+  "速やかに医療機関を受診してください",
+  "直ちに使用を中止してください",
+  "今のケアは少しお休みしましょう",
+  "ご要望にお応えできずごめんなさい",
+  "手持ちアイテムからご提案しますね",
+];
+
 export const AiSuggestionCard = ({ suggestion }: AiSuggestionCardProps) => {
   if (!suggestion) {
     return (
@@ -59,6 +70,11 @@ export const AiSuggestionCard = ({ suggestion }: AiSuggestionCardProps) => {
   const hasItemB = parts.length >= 2 && parts[1] && parts[1] !== "null" && parts[1].trim() !== "";
   const hasTwoItems = basisText.includes(" × ") && hasItemA && hasItemB;
 
+  // 3. SOS系のタイトルかどうかを判定（部分一致で安全に判定）
+  const isSOS = SOS_TITLES.some((sosTitle) =>
+    suggestion.title.includes(sosTitle)
+  );
+
   return (
     <section className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
       <div className="flex">
@@ -81,39 +97,42 @@ export const AiSuggestionCard = ({ suggestion }: AiSuggestionCardProps) => {
             </p>
           )}
 
-          <div className="mt-4 rounded-xl border border-rose-100 bg-rose-50/50 p-4 text-center">
-            <p className="text-xs font-black tracking-wider text-rose-400 uppercase">
-              🫧 おすすめのセット 🫧
-            </p>
+          {/* isSOSがfalse（通常時）の場合のみ、おすすめセットエリアを表示する */}
+          {!isSOS && (
+            <div className="mt-4 rounded-xl border border-rose-100 bg-rose-50/50 p-4 text-center">
+              <p className="text-xs font-black tracking-wider text-rose-400 uppercase">
+                🫧 おすすめのセット 🫧
+              </p>
 
-            {hasTwoItems ? (
-              // アイテムが2つ揃っている場合
-              <div className="mt-3 flex flex-col items-center justify-center text-[11px] font-medium text-gray-700">
-                <span className="px-2 leading-tight">
-                  {parts[0]}
-                </span>
-
-                <div className="my-1 flex items-center gap-1.5">
-                  <div className="h-[1px] w-15 bg-rose-100" />
-
-                  <span className="font-sans text-[14px] font-bold leading-none text-rose-300">
-                    ×
+              {hasTwoItems ? (
+                // アイテムが2つ揃っている場合
+                <div className="mt-3 flex flex-col items-center justify-center text-[11px] font-medium text-gray-700">
+                  <span className="px-2 leading-tight">
+                    {parts[0]}
                   </span>
 
-                  <div className="h-[1px] w-15 bg-rose-100" />
-                </div>
+                  <div className="my-1 flex items-center gap-1.5">
+                    <div className="h-[1px] w-15 bg-rose-100" />
 
-                <span className="px-2 leading-tight">
-                  {parts[1]}
-                </span>
-              </div>
-            ) : (
-              // 0個、または1個しか登録がない場合（指定のテキストを表示）
-              <p className="mt-2 text-[11px] leading-relaxed font-medium text-gray-600">
-                アイテム登録から普段お使いのスキンケアを複数個登録しておくと、今日の肌状態に合わせたおすすめセットが提案されます💡
-              </p>
-            )}
-          </div>
+                    <span className="font-sans text-[14px] font-bold leading-none text-rose-300">
+                      ×
+                    </span>
+
+                    <div className="h-[1px] w-15 bg-rose-100" />
+                  </div>
+
+                  <span className="px-2 leading-tight">
+                    {parts[1]}
+                  </span>
+                </div>
+              ) : (
+                // 0個、または1個しか登録がない場合（指定のテキストを表示）
+                <p className="mt-2 text-[11px] leading-relaxed font-medium text-gray-600">
+                  アイテム登録から普段お使いのスキンケアを複数個登録しておくと、今日の肌状態に合わせたおすすめセットが提案されます💡
+                </p>
+              )}
+            </div>
+          )}
 
           <p className="mt-4 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-[10px] leading-relaxed text-rose-500">
             {AI_DISCLAIMER_TEXT}
