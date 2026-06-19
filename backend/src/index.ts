@@ -12,8 +12,18 @@ import aiSuggestions from "./routes/ai-suggestions.js";
 const app = new Hono();
 const prisma = new PrismaClient();
 
-// 全てのルートにcors適用
-app.use("/*", cors());
+// 全てのルートにcors適用（許可オリジンを限定）
+app.use(
+  "/*",
+  cors({
+    origin: [
+      "http://localhost:3000",
+      // 本番デプロイ時はフロントのURLをここに追加（例: "https://your-app.vercel.app"）
+    ],
+    allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allowHeaders: ["Content-Type", "Authorization"],
+  }),
+);
 
 // 全てのリクエストのログ取得
 app.use("*", logger());
