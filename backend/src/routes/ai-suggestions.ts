@@ -136,7 +136,6 @@ app.post("/", async (c) => {
         .join("\n")
     : "（対象期間の記録なし）";
 
-  console.log("AIに渡すログの全文:", logsText);
 
   // --- 第2幕: プロンプト組み立て ---
   const systemPrompt = `あなたは皮膚科専門医のキャラクターとして、スキンケアアプリのユーザーにアドバイスをします。今日は ${realToday} です。
