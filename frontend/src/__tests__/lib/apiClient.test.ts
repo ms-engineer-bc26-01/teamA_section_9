@@ -14,6 +14,12 @@ type MockUser = {
   getIdToken: () => Promise<string>;
 };
 
+const createMockResponse = (response: {
+  ok: boolean;
+  status: number;
+  json: ReturnType<typeof vi.fn>;
+}) => response as unknown as Response;
+
 const importApiClient = async () => {
   const { apiClient } = await import("@/lib/apiClient");
   return apiClient;
@@ -32,7 +38,11 @@ const importAuthMocks = async () => {
 const mockAuthStateChange = async (user: MockUser | null) => {
   const { onAuthStateChanged } = await importAuthMocks();
   onAuthStateChanged.mockImplementation((_auth, callback) => {
-    queueMicrotask(() => callback(user as never));
+    queueMicrotask(() => {
+      if (typeof callback === "function") {
+        callback(user as never);
+      }
+    });
     return vi.fn();
   });
 };
@@ -56,11 +66,11 @@ describe("apiClient", () => {
       getIdToken: vi.fn().mockResolvedValue("token-123"),
     };
     auth.currentUser = user;
-    vi.mocked(fetch).mockResolvedValue({
+    vi.mocked(fetch).mockResolvedValue(createMockResponse({
       ok: true,
       status: 200,
       json: vi.fn().mockResolvedValue({ result: "ok" }),
-    } as Response);
+    }));
 
     const result = await apiClient.get<{ result: string }>("/users", {
       headers: { "X-Trace-Id": "trace-1" },
@@ -86,14 +96,18 @@ describe("apiClient", () => {
     };
     auth.currentUser = null;
     onAuthStateChanged.mockImplementation((_auth, callback) => {
-      queueMicrotask(() => callback(user as never));
+      queueMicrotask(() => {
+        if (typeof callback === "function") {
+          callback(user as never);
+        }
+      });
       return vi.fn();
     });
-    vi.mocked(fetch).mockResolvedValue({
+    vi.mocked(fetch).mockResolvedValue(createMockResponse({
       ok: true,
       status: 200,
       json: vi.fn().mockResolvedValue({ id: 1 }),
-    } as Response);
+    }));
 
     await apiClient.get<{ id: number }>("profile");
 
@@ -112,11 +126,11 @@ describe("apiClient", () => {
     const { auth } = await importAuthMocks();
     auth.currentUser = null;
     await mockAuthStateChange(null);
-    vi.mocked(fetch).mockResolvedValue({
+    vi.mocked(fetch).mockResolvedValue(createMockResponse({
       ok: true,
       status: 200,
       json: vi.fn().mockResolvedValue({ created: true }),
-    } as Response);
+    }));
 
     const result = await apiClient.post<{ created: boolean }, { name: string }>(
       "/items",
@@ -141,11 +155,11 @@ describe("apiClient", () => {
     auth.currentUser = null;
     await mockAuthStateChange(null);
     const json = vi.fn();
-    vi.mocked(fetch).mockResolvedValue({
+    vi.mocked(fetch).mockResolvedValue(createMockResponse({
       ok: true,
       status: 204,
       json,
-    } as unknown as Response);
+    }));
 
     const result = await apiClient.delete("/items/1");
 
@@ -158,11 +172,11 @@ describe("apiClient", () => {
     const { auth } = await importAuthMocks();
     auth.currentUser = null;
     await mockAuthStateChange(null);
-    vi.mocked(fetch).mockResolvedValue({
+    vi.mocked(fetch).mockResolvedValue(createMockResponse({
       ok: false,
       status: 400,
       json: vi.fn().mockResolvedValue({ message: "入力内容が不正です" }),
-    } as Response);
+    }));
 
     await expect(apiClient.get("/items")).rejects.toThrow("入力内容が不正です");
   });
@@ -172,11 +186,11 @@ describe("apiClient", () => {
     const { auth } = await importAuthMocks();
     auth.currentUser = null;
     await mockAuthStateChange(null);
-    vi.mocked(fetch).mockResolvedValue({
+    vi.mocked(fetch).mockResolvedValue(createMockResponse({
       ok: false,
       status: 503,
       json: vi.fn().mockRejectedValue(new Error("invalid json")),
-    } as Response);
+    }));
 
     await expect(apiClient.get("/items")).rejects.toThrow(
       "API request failed: 503",
