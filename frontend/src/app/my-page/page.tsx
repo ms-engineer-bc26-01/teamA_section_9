@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getMyProfile, updateMyProfile } from "@/api/profiles";
 import { deleteUserItem, getMyUserItems } from "@/api/userItems";
+import { ErrorFallback } from "@/components/common/ErrorFallback";
 import { ErrorMessage } from "@/components/common/ErrorMessage";
 import { Loading } from "@/components/common/Loading";
 import { AppShell } from "@/components/layout/AppShell";
@@ -14,6 +15,7 @@ import { ProfileCard } from "@/features/my-page/components/ProfileCard";
 import { ProfileEditModal } from "@/features/my-page/components/ProfileEditModal";
 import { UserItemList } from "@/features/my-page/components/UserItemList";
 import { authClient } from "@/lib/authClient";
+import { useApiError } from "@/hooks/useApiError";
 import type { Profile, UserItem } from "@/types/models";
 
 type MyPageData = {
@@ -44,6 +46,7 @@ export default function MyPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [isProfileEditModalOpen, setIsProfileEditModalOpen] = useState(false);
   const [isItemRegisterModalOpen, setIsItemRegisterModalOpen] = useState(false);
+  const { error, clearError, handleError } = useApiError();
 
   const showSuccessMessage = (message: string) => {
     setSuccessMessage(message);
@@ -53,24 +56,27 @@ export default function MyPage() {
     }, 1800);
   };
 
+  const loadMyPageData = useCallback(async () => {
+    const data = await fetchMyPageData();
+
+    setProfile(data.profile);
+    setUserItems(data.userItems);
+    clearError();
+  }, [clearError]);
+
   useEffect(() => {
     let isMounted = true;
 
-    const loadMyPageData = async () => {
+    const runLoadMyPageData = async () => {
       try {
-        const data = await fetchMyPageData();
-
+        await loadMyPageData();
+      } catch (nextError) {
         if (!isMounted) return;
 
-        setProfile(data.profile);
-        setUserItems(data.userItems);
-        setErrorMessage("");
-      } catch (error) {
-        console.error(error);
-
-        if (!isMounted) return;
-
-        setErrorMessage("マイページ情報の取得に失敗しました。");
+        handleError(nextError, {
+          fallbackMessage: "マイページ情報の取得に失敗しました。",
+          context: "MyPage.loadMyPageData",
+        });
       } finally {
         if (!isMounted) return;
 
@@ -78,22 +84,24 @@ export default function MyPage() {
       }
     };
 
-    void loadMyPageData();
+    void runLoadMyPageData();
 
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [handleError, loadMyPageData]);
 
   const handleRegistered = async () => {
     try {
       const latestUserItems = await getMyUserItems();
 
       setUserItems(latestUserItems);
-      setErrorMessage("");
-    } catch (error) {
-      console.error(error);
-      setErrorMessage("登録済みアイテムの再取得に失敗しました。");
+      clearError();
+    } catch (nextError) {
+      handleError(nextError, {
+        fallbackMessage: "登録済みアイテムの再取得に失敗しました。",
+        context: "MyPage.handleRegistered",
+      });
     }
   };
 
@@ -107,11 +115,13 @@ export default function MyPage() {
         ),
       );
 
-      setErrorMessage("");
+      clearError();
       showSuccessMessage("アイテムを削除しました。");
-    } catch (error) {
-      console.error(error);
-      setErrorMessage("所有アイテムの削除に失敗しました。");
+    } catch (nextError) {
+      handleError(nextError, {
+        fallbackMessage: "所有アイテムの削除に失敗しました。",
+        context: "MyPage.handleDeleteUserItem",
+      });
     }
   };
 
@@ -124,11 +134,13 @@ export default function MyPage() {
       });
 
       setProfile(savedProfile);
-      setErrorMessage("");
+      clearError();
       showSuccessMessage("プロフィールを保存しました。");
-    } catch (error) {
-      console.error(error);
-      setErrorMessage("プロフィールの保存に失敗しました。");
+    } catch (nextError) {
+      handleError(nextError, {
+        fallbackMessage: "プロフィールの保存に失敗しました。",
+        context: "MyPage.handleSaveProfile",
+      });
     }
   };
 
@@ -152,6 +164,14 @@ export default function MyPage() {
           <MyPageHeader />
 
           {isLoading && <Loading text="マイページを読み込み中..." />}
+
+          {!isLoading && error && (
+            <ErrorFallback
+              error={error}
+              onRetry={loadMyPageData}
+              isRetrying={isLoading}
+            />
+          )}
 
           {!isLoading && errorMessage && (
             <ErrorMessage message={errorMessage} />

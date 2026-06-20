@@ -1,7 +1,6 @@
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import type { AppError } from "@/types/error";
-import { logError } from "@/lib/errorHandler";
+import { createAppError, logError } from "@/lib/errorHandler";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -47,6 +46,7 @@ const request = async <TResponse>(
   path: string,
   options: RequestInit = {},
 ): Promise<TResponse> => {
+  const isAiRequest = path.includes("suggestion") || path.includes("ai");
   const authHeaders = await getAuthHeaders();
 
   let response: Response;
@@ -60,13 +60,14 @@ const request = async <TResponse>(
       },
     });
   } catch (fetchError) {
-    // ネットワーク障害
-    const networkError: AppError = {
+    const networkError = createAppError({
       category: "network",
       message:
         "ネットワークに接続できませんでした。通信環境を確認して再度お試しください。",
+      details:
+        fetchError instanceof Error ? fetchError.message : "fetch に失敗しました。",
       originalError: fetchError,
-    };
+    });
     logError(networkError, "apiClient");
     throw networkError;
   }
@@ -81,43 +82,42 @@ const request = async <TResponse>(
       // JSON以外のエラーはそのまま扱う
     }
 
-    // 認証エラー
     if (response.status === 401 || response.status === 403) {
-      const authError: AppError = {
+      const authError = createAppError({
         category: "auth",
         statusCode: response.status,
         message:
           response.status === 403
             ? "このリソースへのアクセス権がありません。"
             : "認証に失敗しました。再度ログインしてください。",
+        details: serverMessage,
         originalError: new Error(serverMessage),
-      };
+      });
       logError(authError, "apiClient");
       throw authError;
     }
 
-    // AI処理エラー（AIエンドポイントからの 5xx）
-    if (
-      response.status >= 500 &&
-      (path.includes("suggestion") || path.includes("ai"))
-    ) {
-      const aiError: AppError = {
+    if (response.status >= 500 && isAiRequest) {
+      const aiError = createAppError({
         category: "ai",
         statusCode: response.status,
-        message: serverMessage,
+        message:
+          "AIの処理に失敗しました。少し時間をおいてから再試行してください。",
+        details: serverMessage,
         originalError: new Error(serverMessage),
-      };
+      });
       logError(aiError, "apiClient");
       throw aiError;
     }
 
-    // その他のAPIエラー
-    const apiError: AppError = {
+    const apiError = createAppError({
       category: "api",
       statusCode: response.status,
-      message: serverMessage,
+      message:
+        "データの取得または保存に失敗しました。時間をおいて再度お試しください。",
+      details: serverMessage,
       originalError: new Error(serverMessage),
-    };
+    });
     logError(apiError, "apiClient");
     throw apiError;
   }
@@ -126,7 +126,25 @@ const request = async <TResponse>(
     return undefined as TResponse;
   }
 
-  return response.json() as Promise<TResponse>;
+  try {
+    return (await response.json()) as TResponse;
+  } catch (parseError) {
+    const invalidResponseError = createAppError({
+      category: isAiRequest ? "ai" : "api",
+      statusCode: response.status,
+      message: isAiRequest
+        ? "AIの応答を正しく読み取れませんでした。もう一度お試しください。"
+        : "サーバーからの応答を読み取れませんでした。時間をおいて再度お試しください。",
+      details:
+        parseError instanceof Error
+          ? parseError.message
+          : "レスポンス JSON の解析に失敗しました。",
+      originalError: parseError,
+    });
+
+    logError(invalidResponseError, "apiClient");
+    throw invalidResponseError;
+  }
 };
 
 export const apiClient = {
