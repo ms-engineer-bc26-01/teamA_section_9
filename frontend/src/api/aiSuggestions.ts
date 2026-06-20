@@ -1,5 +1,6 @@
 import { apiClient } from "@/lib/apiClient";
 import { USE_MOCK_API } from "@/lib/constants";
+import { createAppError, logError } from "@/lib/errorHandler";
 import { mockAiSuggestions } from "@/mocks/mockAiSuggestions";
 import type { AiSuggestion } from "@/types/models";
 
@@ -37,6 +38,36 @@ type ApiAiSuggestion = {
 type GetAiSuggestionsResponse = {
   suggestions: ApiAiSuggestion[];
   total: number;
+};
+
+const isApiAiSuggestion = (value: unknown): value is ApiAiSuggestion => {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const candidate = value as Partial<ApiAiSuggestion>;
+
+  return (
+    typeof candidate.id === "string" &&
+    typeof candidate.user_id === "string" &&
+    typeof candidate.suggested_at === "string" &&
+    typeof candidate.suggestion_type === "string" &&
+    typeof candidate.title === "string" &&
+    typeof candidate.created_at === "string"
+  );
+};
+
+const toInvalidAiResponseError = (details: string) => {
+  const error = createAppError({
+    category: "ai",
+    message: "AIの応答形式が不正です。時間をおいて再度お試しください。",
+    details,
+    originalError: new Error(details),
+  });
+
+  logError(error, "aiSuggestions");
+
+  return error;
 };
 
 const toAiSuggestion = (apiSuggestion: ApiAiSuggestion): AiSuggestion => {
@@ -85,6 +116,12 @@ export const createAiSuggestion = async (
     CreateAiSuggestionApiRequest
   >("/api/ai_suggestions", toCreateAiSuggestionApiRequest(request));
 
+  if (!isApiAiSuggestion(response)) {
+    throw toInvalidAiResponseError(
+      "createAiSuggestion response is missing required AI suggestion fields.",
+    );
+  }
+
   return toAiSuggestion(response);
 };
 
@@ -108,6 +145,18 @@ export const getLatestAiSuggestion = async (
   const response = await apiClient.get<GetAiSuggestionsResponse>(
     `/api/ai_suggestions?${searchParams.toString()}`,
   );
+
+  if (!Array.isArray(response.suggestions)) {
+    throw toInvalidAiResponseError(
+      "getLatestAiSuggestion response.suggestions is not an array.",
+    );
+  }
+
+  if (response.suggestions[0] && !isApiAiSuggestion(response.suggestions[0])) {
+    throw toInvalidAiResponseError(
+      "getLatestAiSuggestion response contains an invalid AI suggestion entry.",
+    );
+  }
 
   return response.suggestions[0]
     ? toAiSuggestion(response.suggestions[0])

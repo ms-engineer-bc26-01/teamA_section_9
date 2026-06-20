@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getDailyCommentAiSuggestion } from "@/api/aiSuggestions";
 import {
@@ -9,13 +9,14 @@ import {
   updateDailyLog,
 } from "@/api/dailyLogs";
 import { getMyUserItems } from "@/api/userItems";
-import { ErrorMessage } from "@/components/common/ErrorMessage";
+import { ErrorFallback } from "@/components/common/ErrorFallback";
 import { Loading } from "@/components/common/Loading";
 import { AppShell } from "@/components/layout/AppShell";
 import { AiCommentModal } from "@/features/daily-log/components/AiCommentModal";
 import { DailyLogForm } from "@/features/daily-log/components/DailyLogForm";
 import { DateSelectModal } from "@/features/daily-log/components/DateSelectModal";
 import { DateSelectorButton } from "@/features/daily-log/components/DateSelectorButton";
+import { useApiError } from "@/hooks/useApiError";
 import type { DailyLogFormValues } from "@/features/daily-log/types";
 import {
   createEmptyDailyLogFormValues,
@@ -119,57 +120,71 @@ export default function RecordPage() {
     useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [isDateSelectModalOpen, setIsDateSelectModalOpen] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
+  const { error, clearError, handleError } = useApiError();
+
+  const fetchInitialData = useCallback(async () => {
+    try {
+      const userItemsResponse = await getMyUserItems();
+
+      setUserItems(userItemsResponse);
+    } catch (nextError) {
+      handleError(nextError, {
+        fallbackMessage: "手持ちアイテムの取得に失敗しました。",
+        context: "RecordPage.fetchInitialData",
+      });
+    }
+  }, [handleError]);
+
+  const fetchDailyLog = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      clearError();
+
+      const dailyLog = await getDailyLogByDate(selectedDate);
+
+      if (dailyLog) {
+        setCurrentDailyLog(dailyLog);
+        setInitialValues(toDailyLogFormValues(dailyLog));
+        return;
+      }
+
+      const previousDate = getPreviousDateString(selectedDate);
+      const previousDailyLog = await getDailyLogByDate(previousDate);
+
+      setCurrentDailyLog(null);
+      setInitialValues({
+        ...createEmptyDailyLogFormValues(selectedDate),
+        isMenstruation: previousDailyLog?.isMenstruation === true,
+      });
+    } catch (nextError) {
+      handleError(nextError, {
+        fallbackMessage: "日次記録の取得に失敗しました。",
+        context: "RecordPage.fetchDailyLog",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedDate, clearError, handleError]);
+
+  const reloadRecordPage = useCallback(async () => {
+    await Promise.all([fetchInitialData(), fetchDailyLog()]);
+  }, [fetchDailyLog, fetchInitialData]);
 
   useEffect(() => {
-    const fetchInitialData = async () => {
-      try {
-        setErrorMessage("");
-
-        const userItemsResponse = await getMyUserItems();
-
-        setUserItems(userItemsResponse);
-      } catch (error) {
-        console.error(error);
-        setErrorMessage("手持ちアイテムの取得に失敗しました。");
-      }
+    const runFetchInitialData = async () => {
+      await fetchInitialData();
     };
 
-    void fetchInitialData();
-  }, []);
+    void runFetchInitialData();
+  }, [fetchInitialData]);
 
   useEffect(() => {
-    const fetchDailyLog = async () => {
-      try {
-        setIsLoading(true);
-        setErrorMessage("");
-
-        const dailyLog = await getDailyLogByDate(selectedDate);
-
-        if (dailyLog) {
-          setCurrentDailyLog(dailyLog);
-          setInitialValues(toDailyLogFormValues(dailyLog));
-          return;
-        }
-
-        const previousDate = getPreviousDateString(selectedDate);
-        const previousDailyLog = await getDailyLogByDate(previousDate);
-
-        setCurrentDailyLog(null);
-        setInitialValues({
-          ...createEmptyDailyLogFormValues(selectedDate),
-          isMenstruation: previousDailyLog?.isMenstruation === true,
-        });
-      } catch (error) {
-        console.error(error);
-        setErrorMessage("日次記録の取得に失敗しました。");
-      } finally {
-        setIsLoading(false);
-      }
+    const runFetchDailyLog = async () => {
+      await fetchDailyLog();
     };
 
-    void fetchDailyLog();
-  }, [selectedDate]);
+    void runFetchDailyLog();
+  }, [fetchDailyLog]);
 
   const handleSubmit = async (values: DailyLogFormValues) => {
     if (!values.skinCondition) {
@@ -178,7 +193,7 @@ export default function RecordPage() {
 
     try {
       setIsSubmitting(true);
-      setErrorMessage("");
+      clearError();
 
       const request = {
         logDate: selectedDate,
@@ -218,9 +233,11 @@ export default function RecordPage() {
       } finally {
         setIsGeneratingDailyComment(false);
       }
-    } catch (error) {
-      console.error(error);
-      setErrorMessage("記録の保存に失敗しました。");
+    } catch (nextError) {
+      handleError(nextError, {
+        fallbackMessage: "記録の保存に失敗しました。",
+        context: "RecordPage.handleSubmit",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -268,11 +285,15 @@ export default function RecordPage() {
 
           {isLoading && <Loading text="記録画面を読み込み中..." />}
 
-          {!isLoading && errorMessage && (
-            <ErrorMessage message={errorMessage} />
+          {!isLoading && error && (
+            <ErrorFallback
+              error={error}
+              onRetry={reloadRecordPage}
+              isRetrying={isLoading}
+            />
           )}
 
-          {!isLoading && !errorMessage && (
+          {!isLoading && !error && (
             <DailyLogForm
               key={`${selectedDate}-${currentDailyLog?.id ?? "new"}`}
               initialValues={initialValues}
