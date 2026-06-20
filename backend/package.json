@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.19.14",
+    "@hono/swagger-ui": "^0.6.1",
     "@prisma/client": "^5.22.0",
     "firebase-admin": "^13.10.0",
     "hono": "^4.12.23",

@@ -8,6 +8,8 @@ import users from "./routes/users.js";
 import items from "./routes/items.js";
 import userItems from "./routes/user-items.js";
 import aiSuggestions from "./routes/ai-suggestions.js";
+import { swaggerUI } from "@hono/swagger-ui";
+import { serveStatic } from "@hono/node-server/serve-static";
 
 const app = new Hono();
 const prisma = new PrismaClient();
@@ -47,6 +49,25 @@ app.onError((err, c) => {
     },
     500,
   );
+});
+
+// openapi.yml を静的ファイルとして配信
+app.use("/docs/*", serveStatic({ root: "./" }));
+
+// Swagger UI画面
+app.get(
+  "/docs",
+  swaggerUI({
+    url: "/docs/openapi.yml",
+  }),
+);
+
+// APIテスト用
+app.get("/api/test", (c) => {
+  return c.json({
+    status: "success",
+    message: "Hello Hono!",
+  });
 });
 
 // 存在しないURLが叩かれた時の処理
@@ -93,14 +114,6 @@ app.get("/", async (c) => {
       <p style="font-size: 0.8rem; color: #999; text-align: center;">SkinMate API v0.2.0 - Node.js Server</p>
     </div>
   `);
-});
-
-// APIテスト用
-app.get("/api/test", (c) => {
-  return c.json({
-    status: "success",
-    message: "Hello Hono!",
-  });
 });
 
 serve({ fetch: app.fetch, port: 8000 });
