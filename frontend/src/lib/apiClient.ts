@@ -1,5 +1,7 @@
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import type { AppError } from "@/types/error";
+import { logError } from "@/lib/errorHandler";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -41,32 +43,99 @@ const buildApiUrl = (path: string) => {
   return `${baseUrl}${normalizedPath}`;
 };
 
+/** タイムアウト時間（ミリ秒） */
+const REQUEST_TIMEOUT_MS = 15_000;
+
 const request = async <TResponse>(
   path: string,
   options: RequestInit = {},
 ): Promise<TResponse> => {
   const authHeaders = await getAuthHeaders();
 
-  const response = await fetch(buildApiUrl(path), {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders,
-      ...options.headers,
-    },
-  });
+  // タイムアウト用 AbortController
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(buildApiUrl(path), {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders,
+        ...options.headers,
+      },
+    });
+  } catch (fetchError) {
+    clearTimeout(timeoutId);
+
+    // タイムアウト or ネットワーク障害
+    const isTimeout =
+      fetchError instanceof Error && fetchError.name === "AbortError";
+
+    const networkError: AppError = {
+      category: "network",
+      message: isTimeout
+        ? "リクエストがタイムアウトしました。通信環境を確認して再度お試しください。"
+        : "ネットワークに接続できませんでした。通信環境を確認して再度お試しください。",
+      originalError: fetchError,
+    };
+    logError(networkError, "apiClient");
+    throw networkError;
+  }
+
+  clearTimeout(timeoutId);
 
   if (!response.ok) {
-    let message = `API request failed: ${response.status}`;
+    let serverMessage = `API request failed: ${response.status}`;
 
     try {
       const errorBody = await response.json();
-      message = errorBody.message ?? errorBody.error ?? message;
+      serverMessage = errorBody.message ?? errorBody.error ?? serverMessage;
     } catch {
       // JSON以外のエラーはそのまま扱う
     }
 
-    throw new Error(message);
+    // 認証エラー
+    if (response.status === 401 || response.status === 403) {
+      const authError: AppError = {
+        category: "auth",
+        statusCode: response.status,
+        message:
+          response.status === 403
+            ? "このリソースへのアクセス権がありません。"
+            : "認証に失敗しました。再度ログインしてください。",
+        originalError: new Error(serverMessage),
+      };
+      logError(authError, "apiClient");
+      throw authError;
+    }
+
+    // AI処理エラー（AIエンドポイントからの 5xx）
+    if (
+      response.status >= 500 &&
+      (path.includes("suggestion") || path.includes("ai"))
+    ) {
+      const aiError: AppError = {
+        category: "ai",
+        statusCode: response.status,
+        message: serverMessage,
+        originalError: new Error(serverMessage),
+      };
+      logError(aiError, "apiClient");
+      throw aiError;
+    }
+
+    // その他のAPIエラー
+    const apiError: AppError = {
+      category: "api",
+      statusCode: response.status,
+      message: serverMessage,
+      originalError: new Error(serverMessage),
+    };
+    logError(apiError, "apiClient");
+    throw apiError;
   }
 
   if (response.status === 204) {
