@@ -11,7 +11,7 @@ vi.mock("@/lib/firebase", () => ({
 }));
 
 type MockUser = {
-  getIdToken: ReturnType<typeof vi.fn<() => Promise<string>>>;
+  getIdToken: () => Promise<string>;
 };
 
 const importApiClient = async () => {
@@ -27,6 +27,14 @@ const importAuthMocks = async () => {
     auth: auth as { currentUser: MockUser | null },
     onAuthStateChanged: vi.mocked(onAuthStateChanged),
   };
+};
+
+const mockAuthStateChange = async (user: MockUser | null) => {
+  const { onAuthStateChanged } = await importAuthMocks();
+  onAuthStateChanged.mockImplementation((_auth, callback) => {
+    queueMicrotask(() => callback(user as never));
+    return vi.fn();
+  });
 };
 
 describe("apiClient", () => {
@@ -63,7 +71,7 @@ describe("apiClient", () => {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        Authorization: "******",
+        Authorization: expect.stringMatching(new RegExp("^Bearer ")),
         "X-Trace-Id": "trace-1",
       },
     });
@@ -94,7 +102,7 @@ describe("apiClient", () => {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        Authorization: "******",
+        Authorization: expect.stringMatching(new RegExp("^Bearer ")),
       },
     });
   });
@@ -103,6 +111,7 @@ describe("apiClient", () => {
     const apiClient = await importApiClient();
     const { auth } = await importAuthMocks();
     auth.currentUser = null;
+    await mockAuthStateChange(null);
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
       status: 200,
@@ -130,6 +139,7 @@ describe("apiClient", () => {
     const apiClient = await importApiClient();
     const { auth } = await importAuthMocks();
     auth.currentUser = null;
+    await mockAuthStateChange(null);
     const json = vi.fn();
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
@@ -147,6 +157,7 @@ describe("apiClient", () => {
     const apiClient = await importApiClient();
     const { auth } = await importAuthMocks();
     auth.currentUser = null;
+    await mockAuthStateChange(null);
     vi.mocked(fetch).mockResolvedValue({
       ok: false,
       status: 400,
@@ -160,6 +171,7 @@ describe("apiClient", () => {
     const apiClient = await importApiClient();
     const { auth } = await importAuthMocks();
     auth.currentUser = null;
+    await mockAuthStateChange(null);
     vi.mocked(fetch).mockResolvedValue({
       ok: false,
       status: 503,
@@ -176,6 +188,7 @@ describe("apiClient", () => {
     const apiClient = await importApiClient();
     const { auth } = await importAuthMocks();
     auth.currentUser = null;
+    await mockAuthStateChange(null);
 
     await expect(apiClient.get("/items")).rejects.toThrow(
       "NEXT_PUBLIC_API_BASE_URL is not defined.",
