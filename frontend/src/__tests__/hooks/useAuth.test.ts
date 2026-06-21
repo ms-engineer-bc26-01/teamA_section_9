@@ -20,7 +20,7 @@ describe("useAuth", () => {
     vi.clearAllMocks();
   });
 
-  const executeAndCaptureError = async (callback: () => Promise<unknown>) => {
+  const executeAndCaptureError = async (callback: () => Promise<unknown>): Promise<Error | null> => {
     let thrownError: Error | null = null;
 
     await act(async () => {
