@@ -178,7 +178,9 @@ describe("apiClient", () => {
       json: vi.fn().mockResolvedValue({ message: "入力内容が不正です" }),
     }));
 
-    await expect(apiClient.get("/items")).rejects.toThrow("入力内容が不正です");
+    await expect(apiClient.get("/items")).rejects.toThrow(
+      "データの取得または保存に失敗しました。時間をおいて再度お試しください。",
+    );
   });
 
   it("エラー本文がJSONでない場合はステータスコードベースの文言を返す", async () => {
@@ -193,7 +195,7 @@ describe("apiClient", () => {
     }));
 
     await expect(apiClient.get("/items")).rejects.toThrow(
-      "API request failed: 503",
+      "データの取得または保存に失敗しました。時間をおいて再度お試しください。",
     );
   });
 
@@ -205,7 +207,7 @@ describe("apiClient", () => {
     await mockAuthStateChange(null);
 
     await expect(apiClient.get("/items")).rejects.toThrow(
-      "NEXT_PUBLIC_API_BASE_URL is not defined.",
+      "ネットワークに接続できませんでした。通信環境を確認して再度お試しください。",
     );
   });
 });
