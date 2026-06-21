@@ -2,29 +2,36 @@ openapi: 3.0.3
 
 info:
   title: SkinMate API
-  version: 0.2.0
+  version: 0.3.0
   description: |
     SkinMate MVP版 API設計書。
-    更新日：2026/06/02
+    更新日：2026/06/20（バックエンド実装に同期）
 
-    認証は Firebase Authentication を利用する。
+    ## 認証
+    Firebase Authentication を利用する。
     フロントエンドで Firebase Auth SDK によりログイン・新規登録を行い、
     バックエンドAPIでは Authorization ヘッダーで受け取った Firebase ID Token を検証する。
+    全エンドポイントが `Authorization: Bearer <Firebase ID Token>` を必須とする。
 
-    MVPスコープ外:
-      - 独自ログインAPI
-      - 独自サインアップAPI
-      - 生理周期API
-      - 日々の肌記録削除API
-      - 成分検索API
-      - カテゴリ一覧取得API
-      - AI提案最新取得専用API
-      - いつものセット機能
-      - 有料プラン機能
+    ## エラー形式
+    - ハンドリング済みエラー（400/401/404/409 と各ルートの内部500）は
+      `errors.ts` 経由で **{ error, message }** 形で返す。
+      error コード例: UNAUTHORIZED / BAD_REQUEST / NOT_FOUND / ALREADY_EXISTS /
+      ITEM_LIMIT_EXCEEDED / INTERNAL_SERVER_ERROR。
+    - 未捕捉の例外（グローバル onError）と存在しないURL（notFound）は、
+      別形の **{ status, message }** を返す（AI生成失敗など一部の500がこれに該当）。
+
+    ## MVPスコープ外
+      - 独自ログイン/サインアップAPI（Firebase側で実施）
+      - 生理周期API（daily_logs.isMenstruation に統合）
+      - 日々の肌記録の削除API
+      - ユーザー向け成分検索API / カテゴリ一覧取得API
+      - AI提案 最新取得専用API
+      - いつものセット機能 / 有料プラン機能
 
 servers:
-  - url: http://localhost:3000
-    description: ローカル開発環境
+  - url: http://localhost:8000
+    description: ローカル開発環境（バックエンド。Swagger UI は /docs）
 
 tags:
   - name: Users
@@ -41,14 +48,12 @@ tags:
 paths:
   /api/users/me:
     get:
-      tags:
-        - Users
+      tags: [Users]
       summary: 自分のプロフィール取得（未登録時は初期作成）
       description: |
-        【Firebase Auth連携】
-        1. AuthorizationヘッダーのIDトークンからFirebase UIDを特定。
-        2. DB（profiles）に該当UIDがいれば、その情報を返す。
-        3. DBにいなければ、Firebaseの情報を元に新規レコードを作成して返す。
+        AuthorizationヘッダーのIDトークンからFirebase UIDを特定し、
+        profiles に該当UIDがいればその情報を返す。いなければ Firebase の情報を元に
+        新規レコードを作成して返す。
       security:
         - firebaseAuth: []
       responses:
@@ -62,14 +67,11 @@ paths:
           $ref: "#/components/responses/Unauthorized"
 
     patch:
-      tags:
-        - Users
-      summary: プロフィール編集（肌タイプ登録含む）
+      tags: [Users]
+      summary: プロフィール編集（肌タイプ登録含む・S3-10）
       description: |
-        対応FR - FR-004
-
-        自分のプロフィール情報を更新する。
-        メールアドレス・パスワードは Firebase Authentication 側で管理するため、このAPIでは扱わない。
+        自分のプロフィール情報を部分更新する。送られてきた項目だけ更新する。
+        メールアドレス・パスワードは Firebase Authentication 側で管理するため扱わない。
       security:
         - firebaseAuth: []
       requestBody:
@@ -77,24 +79,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                  example: 加藤 美咲
-                birth_day:
-                  type: string
-                  format: date
-                  example: "1998-10-31"
-                skin_type:
-                  type: string
-                  enum:
-                    - normal
-                    - dry
-                    - oily
-                    - combination
-                    - sensitive
-                  example: combination
+              $ref: "#/components/schemas/UserUpdateInput"
       responses:
         "200":
           description: 更新成功
@@ -106,15 +91,16 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /api/daily_logs:
     get:
-      tags:
-        - DailyLogs
-      summary: 日々の肌記録一覧取得
+      tags: [DailyLogs]
+      summary: 日々の肌記録一覧取得（カレンダー表示用）
       description: |
-        カレンダー表示用に、指定期間の肌記録を取得する。
-        MVPでは一覧表示に必要なスキンコンディションのみ返す。
+        指定期間の肌記録を取得する。一覧表示に必要な id・log_date・skin_condition のみ返す。
+        start_date と end_date は必須。
       security:
         - firebaseAuth: []
       parameters:
@@ -122,27 +108,20 @@ paths:
           in: query
           required: true
           description: 取得開始日
-          schema:
-            type: string
-            format: date
-            example: 2026-05-01
+          schema: { type: string, format: date, example: "2026-05-01" }
         - name: end_date
           in: query
           required: true
           description: 取得終了日
-          schema:
-            type: string
-            format: date
-            example: 2026-05-31
+          schema: { type: string, format: date, example: "2026-05-31" }
       responses:
         "200":
-          description: 日々の肌記録一覧取得成功
+          description: 一覧取得成功
           content:
             application/json:
               schema:
                 type: object
-                required:
-                  - logs
+                required: [logs]
                 properties:
                   logs:
                     type: array
@@ -154,21 +133,12 @@ paths:
           $ref: "#/components/responses/Unauthorized"
 
     post:
-      tags:
-        - DailyLogs
-      summary: 日々の肌記録作成
+      tags: [DailyLogs]
+      summary: 日々の肌記録 作成・更新（upsert）
       description: |
-        1日分の肌記録を作成する。
-
-        daily_logs は「ユーザー × 日付」で1件のみ作成される。
-        指定日の記録が存在しない場合は新規作成する。
-
-        使用アイテム履歴は、1日あたり朝と夜を1件ずつ扱う。
-        morning が指定された場合は朝の使用アイテム履歴を作成する。
-        night が指定された場合は夜の使用アイテム履歴を作成する。
-
-        使用アイテムは items.id を指定する。
-        フロントエンドではユーザー所有アイテムからのみ選択させる。
+        1日分の肌記録を作成、または同じ「ユーザー × 日付」が存在すれば更新する。
+        朝/夜の使用アイテムは used_items に指定があった分だけ保存する。
+        成功時のステータスは **200**（201ではない）。
       security:
         - firebaseAuth: []
       requestBody:
@@ -179,7 +149,7 @@ paths:
               $ref: "#/components/schemas/DailyLogUpsertInput"
       responses:
         "200":
-          description: 日々の肌記録作成または更新成功
+          description: 作成または更新成功
           content:
             application/json:
               schema:
@@ -191,77 +161,81 @@ paths:
 
   /api/daily_logs/{log_date}:
     get:
-      tags:
-        - DailyLogs
+      tags: [DailyLogs]
       summary: 指定日の肌記録取得
       description: |
-        指定日の肌記録を取得する。
-
-        1日あたり daily_logs から肌記録を1件取得する。
-        使用アイテム履歴は、log_used_items から朝と夜を1件ずつ取得する。
-        記録が存在しない場合は log: null を返す。
+        指定日の肌記録を1件取得する。使用アイテム履歴は朝/夜を1件ずつ含めて返す。
+        記録が存在しない場合も 200 で `{ "log": null }` を返す（404にはならない）。
       security:
         - firebaseAuth: []
       parameters:
         - name: log_date
           in: path
           required: true
-          description: 取得対象日
-          schema:
-            type: string
-            format: date
-            example: 2026-05-17
+          description: 取得対象日（YYYY-MM-DD）
+          schema: { type: string, format: date, example: "2026-05-17" }
       responses:
         "200":
-          description: 指定日の肌記録取得成功
+          description: 取得成功（記録なしの場合 log は null）
           content:
             application/json:
               schema:
                 type: object
-                required:
-                  - log
+                required: [log]
                 properties:
                   log:
                     nullable: true
                     allOf:
                       - $ref: "#/components/schemas/DailyLogDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/daily_logs/{id}:
+    patch:
+      tags: [DailyLogs]
+      summary: 既存の肌記録を編集（S3-26）
+      description: |
+        既存の肌記録を **記録ID（daily_logs.id）** で部分更新する。
+        ※取得系（GET /api/daily_logs/{log_date}）が「日付」をキーにするのに対し、
+        この編集は「記録ID」をキーにする点に注意（実装に準拠）。
+        基本項目・使用アイテムのいずれも指定が無い場合は 400。
+        本人の記録でない/存在しない場合は 404。
+      security:
+        - firebaseAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 更新対象の記録ID（daily_logs.id）
+          schema: { type: string, example: "7f1a30f0-0e1f-4f4b-9c8d-8f1f5b7c1234" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DailyLogUpdateInput"
+      responses:
+        "200":
+          description: 更新成功（更新後の詳細を返す）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyLogDetail"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
-
-    patch:
-      tags:
-        - DailyLogs
-      summary: 指定日の肌記録更新
-      description: |
-        指定した日付の記録を部分更新する。
-        朝のデータだけ、あるいは夜のデータだけを更新する場合に適している。
-      parameters:
-        - name: log_date
-          in: path
-          required: true
-          schema:
-            type: string
-            format: date
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/DailyLogUpdateInput" # 更新用のスキーマ
-      responses:
-        "200":
-          description: 更新成功
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /api/items:
     get:
-      tags:
-        - Items
+      tags: [Items]
       summary: 化粧品マスタ検索
       description: |
-        化粧品マスタを商品名・ブランド名で検索する。
-        ユーザーが検索するのは製品情報のみとし、成分検索・カテゴリ検索はMVP対象外とする。
-        成分情報はAI提案生成時にバックエンド内部で参照する。
+        化粧品マスタを商品名・ブランド名で部分一致（大文字小文字無視）検索する。
+        q が無ければ全件対象。カテゴリは入れ子オブジェクト `{ id, name }` で返す。
+        成分検索・カテゴリ検索はMVP対象外（成分はAI提案生成時にバックエンド内部で参照）。
       security:
         - firebaseAuth: []
       parameters:
@@ -269,57 +243,46 @@ paths:
           in: query
           required: false
           description: 商品名またはブランド名の検索キーワード
-          schema:
-            type: string
-            example: ジェニフィック
+          schema: { type: string, example: "ジェニフィック" }
         - name: limit
           in: query
           required: false
-          description: 取得件数
-          schema:
-            type: integer
-            default: 20
-            minimum: 1
-            maximum: 100
+          description: 取得件数（1〜100、範囲外は丸め）
+          schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
         - name: offset
           in: query
           required: false
           description: 取得開始位置
-          schema:
-            type: integer
-            default: 0
-            minimum: 0
+          schema: { type: integer, default: 0, minimum: 0 }
       responses:
         "200":
-          description: 化粧品マスタ検索成功
+          description: 検索成功
           content:
             application/json:
               schema:
                 type: object
-                required:
-                  - items
-                  - total
+                required: [items, total]
                 properties:
                   items:
                     type: array
                     items:
-                      $ref: "#/components/schemas/Item"
+                      $ref: "#/components/schemas/ItemSearchResult"
                   total:
                     type: integer
                     example: 120
-        "400":
-          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /api/user_items:
     get:
-      tags:
-        - UserItems
+      tags: [UserItems]
       summary: 自分の手持ちアイテム一覧
       description: |
         ログインユーザーが登録している手持ちアイテム一覧を取得する。
-        記録画面の朝・夜ケア選択肢にも使用する。
+        各要素は user_items.id と、紐づくアイテム情報（カテゴリはフラットな
+        category_id / category_name 形）を含む。
       security:
         - firebaseAuth: []
       responses:
@@ -329,35 +292,23 @@ paths:
             application/json:
               schema:
                 type: object
-                required:
-                  - user_items
+                required: [user_items]
                 properties:
                   user_items:
                     type: array
                     items:
-                      type: object
-                      required:
-                        - id
-                        - item
-                      properties:
-                        id:
-                          type: string
-                          description: user_items.id
-                          example: user_item_001
-                        item:
-                          $ref: "#/components/schemas/Item"
+                      $ref: "#/components/schemas/UserItemEntry"
         "401":
           $ref: "#/components/responses/Unauthorized"
 
     post:
-      tags:
-        - UserItems
-      summary: 手持ちアイテムに追加（MVP上限10件）
+      tags: [UserItems]
+      summary: 手持ちアイテムに追加（MVP上限10件・S3-12）
       description: |
-        対応FR - FR-018
-
-        化粧品マスタから選択したアイテムを、ログインユーザーの手持ちアイテムとして追加する。
-        MVPでは手持ちアイテムの登録上限を10件とする。
+        化粧品マスタから選択したアイテムを手持ちに追加する。
+        登録上限は10件。成功時のステータスは **201**。
+        400 の error コードは BAD_REQUEST（リクエスト不正）または
+        ITEM_LIMIT_EXCEEDED（上限超過）。
       security:
         - firebaseAuth: []
       requestBody:
@@ -365,71 +316,44 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - item_id
-              properties:
-                item_id:
-                  type: string
-                  example: item-001
+              $ref: "#/components/schemas/UserItemCreateInput"
       responses:
         "201":
           description: 追加成功
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - id
-                  - item_id
-                properties:
-                  id:
-                    type: string
-                    description: user_items.id
-                    example: user_item_001
-                  item_id:
-                    type: string
-                    description: items.id
-                    example: item-001
+                $ref: "#/components/schemas/UserItemCreated"
         "400":
-          description: 上限超過またはリクエスト不正
+          description: リクエスト不正（BAD_REQUEST）または上限超過（ITEM_LIMIT_EXCEEDED）
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - error
-                  - message
-                properties:
-                  error:
-                    type: string
-                    example: ITEM_LIMIT_EXCEEDED
-                  message:
-                    type: string
-                    example: 手持ちアイテムは10件までです
+                $ref: "#/components/schemas/ErrorResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
-          description: 指定されたアイテムが存在しない
+          description: 指定されたアイテムが存在しない（NOT_FOUND）
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "409":
-          description: すでに手持ちアイテムとして登録済み
+          description: すでに手持ちアイテムとして登録済み（ALREADY_EXISTS）
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /api/user_items/{id}:
     delete:
-      tags:
-        - UserItems
+      tags: [UserItems]
       summary: 手持ちアイテムを削除
       description: |
-        ログインユーザーの手持ちアイテムから指定アイテムを削除する。
-        過去の肌記録は log_used_items.item_id で items に紐づくため、手持ちアイテム削除後も履歴は保持される。
+        自分の手持ちアイテムから指定アイテムを削除する。成功時は **204**（ボディなし）。
+        過去の肌記録（log_used_items）は items 側に紐づくため、削除後も履歴は保持される。
       security:
         - firebaseAuth: []
       parameters:
@@ -437,80 +361,62 @@ paths:
           in: path
           required: true
           description: user_items.id
-          schema:
-            type: string
-            example: user_item_001
+          schema: { type: string, example: "user_item_001" }
       responses:
         "204":
           description: 削除成功（レスポンスボディなし）
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
-          description: 指定された手持ちアイテムが存在しない
+          description: 指定された手持ちアイテムが存在しない（NOT_FOUND）
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /api/ai_suggestions:
     get:
-      tags:
-        - AISuggestions
+      tags: [AISuggestions]
       summary: AI提案履歴取得
       description: |
         ログインユーザーのAI提案履歴を取得する。
-        最新の提案のみ取得したい場合は sort=desc&limit=1 を指定する。
-        AI提案最新取得専用APIは作成しない。
+        最新1件だけ欲しい場合は sort=desc&limit=1 を指定する。
       security:
         - firebaseAuth: []
       parameters:
         - name: suggestion_type
           in: query
           required: false
-          description: 提案種別
+          description: 提案種別で絞り込み
           schema:
             type: string
-            enum:
-              - home_summary
-              - daily_comment
+            enum: [home_summary, daily_comment]
             example: home_summary
         - name: sort
           in: query
           required: false
-          description: suggested_at の並び順
-          schema:
-            type: string
-            enum:
-              - asc
-              - desc
-            default: desc
+          description: suggested_at の並び順（asc 以外は desc 扱い）
+          schema: { type: string, enum: [asc, desc], default: desc }
         - name: limit
           in: query
           required: false
           description: 取得件数
-          schema:
-            type: integer
-            default: 20
-            minimum: 1
-            maximum: 100
+          schema: { type: integer, default: 20 }
         - name: offset
           in: query
           required: false
           description: 取得開始位置
-          schema:
-            type: integer
-            default: 0
-            minimum: 0
+          schema: { type: integer, default: 0 }
       responses:
         "200":
-          description: AI提案履歴取得成功
+          description: 履歴取得成功
           content:
             application/json:
               schema:
                 type: object
-                required:
-                  - suggestions
-                  - total
+                required: [suggestions, total]
                 properties:
                   suggestions:
                     type: array
@@ -519,24 +425,21 @@ paths:
                   total:
                     type: integer
                     example: 12
-        "400":
-          $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
 
     post:
-      tags:
-        - AISuggestions
+      tags: [AISuggestions]
       summary: AI提案生成
       description: |
-        ログインユーザーの記録・所有アイテム・使用アイテム・成分情報をもとにAI提案を生成し、ai_suggestions に保存する。
+        記録・所有アイテム・成分情報をもとにAI提案を生成し、ai_suggestions に保存する。
+        suggestion_type で用途を分ける（home_summary=直近傾向の要約 /
+        daily_comment=記録保存後の短文コメント）。
+        分析期間はバックエンド側で算出する（home_summary は直近7日、
+        daily_comment は target_date または当日）。成功時のステータスは **201**。
 
-        suggestion_type により用途を分ける。
-          - home_summary: ホーム画面用の直近傾向分析
-          - daily_comment: 記録保存後の短文コメント
-
-        成分情報はバックエンド側で items.ingredient_ids から ingredients を取得し、AIに渡す。
-        ユーザー向けの成分検索APIは提供しない。
+        ※500（AI生成失敗など未捕捉例外）はグローバルハンドラ経由で
+        `{ status, message }` 形になる点に注意。
       security:
         - firebaseAuth: []
       requestBody:
@@ -547,7 +450,7 @@ paths:
               $ref: "#/components/schemas/AISuggestionCreateInput"
       responses:
         "201":
-          description: AI提案生成・保存成功
+          description: 生成・保存成功
           content:
             application/json:
               schema:
@@ -557,11 +460,11 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "500":
-          description: AI提案生成失敗
+          description: AI提案生成失敗など（グローバルハンドラ。形は { status, message }）
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/ServerException"
 
 components:
   securitySchemes:
@@ -571,18 +474,29 @@ components:
       bearerFormat: Firebase ID Token
       description: |
         Firebase Authentication で取得した ID Token を Authorization ヘッダーに指定する。
-        例: Authorization: Bearer <Firebase ID Token>
+        例: `Authorization: Bearer <Firebase ID Token>`
 
   responses:
     BadRequest:
-      description: リクエスト内容が不正
+      description: リクエスト内容が不正（BAD_REQUEST）
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
-
     Unauthorized:
-      description: Firebase ID Token が未指定、無効、または期限切れ
+      description: Firebase ID Token が未指定・無効・期限切れ（UNAUTHORIZED）
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: 対象リソースが存在しない（NOT_FOUND）
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalServerError:
+      description: サーバー内部エラー（INTERNAL_SERVER_ERROR）
       content:
         application/json:
           schema:
@@ -591,10 +505,7 @@ components:
   schemas:
     User:
       type: object
-      required:
-        - id
-        - created_at
-        - updated_at
+      required: [id, created_at, updated_at]
       properties:
         id:
           type: string
@@ -612,44 +523,53 @@ components:
         skin_type:
           type: string
           nullable: true
-          enum:
-            - normal
-            - dry
-            - oily
-            - combination
-            - sensitive
+          description: 肌タイプ（サーバー側でenum強制はしないが、想定値は下記）
+          enum: [normal, dry, oily, combination, sensitive]
           example: combination
         created_at:
           type: string
           format: date-time
-          example: 2026-05-17T10:00:00+09:00
+          example: "2026-05-17T10:00:00.000Z"
         updated_at:
           type: string
           format: date-time
-          example: 2026-05-17T10:00:00+09:00
+          example: "2026-05-17T10:00:00.000Z"
+
+    UserUpdateInput:
+      type: object
+      description: 送られた項目だけ部分更新する。
+      properties:
+        name:
+          type: string
+          nullable: true
+          example: 加藤 美咲
+        birth_day:
+          type: string
+          format: date
+          nullable: true
+          description: YYYY-MM-DD 形式。不正な日付は400。
+          example: "1998-10-31"
+        skin_type:
+          type: string
+          nullable: true
+          enum: [normal, dry, oily, combination, sensitive]
+          example: combination
 
     DailyLogSummary:
       type: object
-      required:
-        - id
-        - log_date
-        - skin_condition
+      required: [id, log_date, skin_condition]
       properties:
         id:
           type: string
-          format: uuid
           example: 7f1a30f0-0e1f-4f4b-9c8d-8f1f5b7c1234
         log_date:
           type: string
           format: date
-          example: 2026-05-17
+          example: "2026-05-17"
         skin_condition:
           type: integer
           description: 1=悪い, 2=普通, 3=良い
-          enum:
-            - 1
-            - 2
-            - 3
+          enum: [1, 2, 3]
           example: 2
 
     DailyLogDetail:
@@ -666,7 +586,6 @@ components:
       properties:
         id:
           type: string
-          format: uuid
           example: 7f1a30f0-0e1f-4f4b-9c8d-8f1f5b7c1234
         user_id:
           type: string
@@ -675,38 +594,22 @@ components:
         log_date:
           type: string
           format: date
-          example: 2026-05-17
+          example: "2026-05-17"
         skin_condition:
           type: integer
-          description: 1=悪い, 2=普通, 3=良い
-          enum:
-            - 1
-            - 2
-            - 3
+          enum: [1, 2, 3]
           example: 2
         weather:
           type: string
           nullable: true
-          enum:
-            - sunny
-            - cloudy
-            - rainy
           example: cloudy
         sleep_level:
           type: string
           nullable: true
-          enum:
-            - short
-            - normal
-            - long
           example: normal
         meal_balance:
           type: string
           nullable: true
-          enum:
-            - good
-            - normal
-            - bad
           example: normal
         free_note:
           type: string
@@ -716,58 +619,39 @@ components:
           type: boolean
           example: false
         used_items:
-          $ref: "#/components/schemas/DailyLogUsedItems"
+          $ref: "#/components/schemas/UsedItems"
         created_at:
           type: string
           format: date-time
-          example: 2026-05-17T10:00:00+09:00
+          example: "2026-05-17T10:00:00.000Z"
         updated_at:
           type: string
           format: date-time
-          example: 2026-05-17T10:00:00+09:00
+          example: "2026-05-17T10:00:00.000Z"
 
     DailyLogUpsertInput:
       type: object
-      required:
-        - log_date
-        - skin_condition
-        - isMenstruation
+      required: [log_date, skin_condition, isMenstruation]
       properties:
         log_date:
           type: string
           format: date
-          example: 2026-05-17
+          example: "2026-05-17"
         skin_condition:
           type: integer
-          description: 1=悪い, 2=普通, 3=良い
-          enum:
-            - 1
-            - 2
-            - 3
+          enum: [1, 2, 3]
           example: 2
         weather:
           type: string
           nullable: true
-          enum:
-            - sunny
-            - cloudy
-            - rainy
           example: cloudy
         sleep_level:
           type: string
           nullable: true
-          enum:
-            - short
-            - normal
-            - long
           example: normal
         meal_balance:
           type: string
           nullable: true
-          enum:
-            - good
-            - normal
-            - bad
           example: normal
         free_note:
           type: string
@@ -777,31 +661,29 @@ components:
           type: boolean
           example: false
         used_items:
-          $ref: "#/components/schemas/DailyLogUsedItemsInput"
+          $ref: "#/components/schemas/UsedItemsInput"
 
     DailyLogUpdateInput:
       type: object
+      description: |
+        部分更新。基本項目・used_items のいずれも無い場合は400。
+        日付はパス（{id}）ではなく記録IDで対象を特定する。
       properties:
-        # パスパラメータで日付を指定するため、リクエストボディから log_date は削除
         skin_condition:
           type: integer
-          description: 1=悪い, 2=普通, 3=良い
           enum: [1, 2, 3]
           example: 3
         weather:
           type: string
           nullable: true
-          enum: [sunny, cloudy, rainy]
           example: sunny
         sleep_level:
           type: string
           nullable: true
-          enum: [short, normal, long]
           example: normal
         meal_balance:
           type: string
           nullable: true
-          enum: [good, normal, bad]
           example: good
         free_note:
           type: string
@@ -811,215 +693,172 @@ components:
           type: boolean
           example: false
         used_items:
-          $ref: "#/components/schemas/DailyLogUsedItemsInput"
+          $ref: "#/components/schemas/UsedItemsInput"
 
-    DailyLogUsedItemsInput:
+    UsedItemsInput:
       type: object
-      description: |
-        1日分の使用アイテム履歴。
-        朝と夜をそれぞれ1件ずつ扱う。
+      description: 1日分の使用アイテム入力。朝/夜をそれぞれ1件ずつ扱う。
       properties:
         morning:
-          $ref: "#/components/schemas/LogUsedItemGroupInput"
+          $ref: "#/components/schemas/UsedItemGroupInput"
         night:
-          $ref: "#/components/schemas/LogUsedItemGroupInput"
+          $ref: "#/components/schemas/UsedItemGroupInput"
 
-    LogUsedItemGroupInput:
+    UsedItemGroupInput:
       type: object
-      required:
-        - item_ids
+      required: [item_ids]
       properties:
         item_ids:
           type: array
-          description: 使用した items.id の配列。配列の順序を使用順として扱う。
-          items:
-            type: string
-            format: uuid
+          description: 使用した items.id の配列（順序＝使用順）。
+          items: { type: string }
           example:
             - 4d3e1e8a-0f4d-4e75-bd12-1b76d7991234
             - 9b8e1a6c-1d9f-432a-bf37-35bfeaf91234
 
-    DailyLogUsedItems:
+    UsedItems:
       type: object
-      description: |
-        1日分の使用アイテム履歴。
-        朝と夜をそれぞれ1件ずつ返す。
+      description: 1日分の使用アイテム履歴。朝/夜をそれぞれ1件ずつ返す（無ければ null）。
+      required: [morning, night]
       properties:
         morning:
           nullable: true
           allOf:
-            - $ref: "#/components/schemas/LogUsedItemGroup"
+            - $ref: "#/components/schemas/UsedItemGroup"
         night:
           nullable: true
           allOf:
-            - $ref: "#/components/schemas/LogUsedItemGroup"
+            - $ref: "#/components/schemas/UsedItemGroup"
 
-    LogUsedItemGroup:
+    UsedItemGroup:
       type: object
-      required:
-        - id
-        - time_of_day
-        - item_ids
-        - items
+      required: [id, time_of_day, item_ids, items]
       properties:
         id:
           type: string
-          format: uuid
           description: log_used_items.id
           example: 64a7736a-857d-4fc0-b496-8b3c26e91234
         time_of_day:
           type: string
-          enum:
-            - morning
-            - night
+          enum: [morning, night]
           example: morning
         item_ids:
           type: array
-          description: 使用した items.id の配列。配列の順序を使用順として扱う。
-          items:
-            type: string
-            format: uuid
-          example:
-            - 4d3e1e8a-0f4d-4e75-bd12-1b76d7991234
-            - 9b8e1a6c-1d9f-432a-bf37-35bfeaf91234
+          description: 使用した items.id の配列（順序＝使用順）。
+          items: { type: string }
         items:
           type: array
-          description: 表示用のアイテム情報。item_ids の順序に合わせて返す。
+          description: 表示用アイテム情報（item_ids の順）。id・brand・name のみ。
           items:
-            $ref: "#/components/schemas/Item"
+            $ref: "#/components/schemas/ItemRef"
 
-    Item:
+    ItemRef:
       type: object
-      required:
-        - id
-        - brand
-        - name
-        - category_id
-        - created_at
-        - updated_at
+      description: 使用アイテム表示用の最小情報。
+      required: [id, brand, name]
+      properties:
+        id: { type: string, example: 4d3e1e8a-0f4d-4e75-bd12-1b76d7991234 }
+        brand: { type: string, example: ランコム }
+        name: { type: string, example: ジェニフィック アドバンスト N }
+
+    ItemSearchResult:
+      type: object
+      description: 化粧品マスタ検索の返却形。カテゴリは入れ子オブジェクト。
+      required: [id, brand, name, category]
+      properties:
+        id: { type: string, example: 4d3e1e8a-0f4d-4e75-bd12-1b76d7991234 }
+        brand: { type: string, example: ランコム }
+        name: { type: string, example: ジェニフィック アドバンスト N }
+        category:
+          $ref: "#/components/schemas/CategoryRef"
+
+    CategoryRef:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, example: b0d1c4de-6c61-4c4a-9b10-3a19fda11234 }
+        name: { type: string, example: 美容液 }
+
+    UserItemEntry:
+      type: object
+      description: 手持ちアイテム一覧の1要素。
+      required: [id, item]
       properties:
         id:
           type: string
-          format: uuid
-          example: 4d3e1e8a-0f4d-4e75-bd12-1b76d7991234
-        brand:
-          type: string
-          example: ランコム
-        name:
-          type: string
-          example: ジェニフィック アドバンスト N
+          description: user_items.id
+          example: user_item_001
+        item:
+          $ref: "#/components/schemas/UserItemProduct"
+
+    UserItemProduct:
+      type: object
+      description: 手持ちアイテムに紐づく製品情報（カテゴリはフラット形）。
+      required: [id, brand, name, category_id, category_name, created_at, updated_at]
+      properties:
+        id: { type: string, example: 4d3e1e8a-0f4d-4e75-bd12-1b76d7991234 }
+        brand: { type: string, example: ランコム }
+        name: { type: string, example: ジェニフィック アドバンスト N }
         category_id:
           type: string
-          format: uuid
-          description: categories.id。カテゴリ一覧取得APIはMVPでは提供しない。
           example: b0d1c4de-6c61-4c4a-9b10-3a19fda11234
         category_name:
           type: string
-          nullable: true
-          description: 表示用カテゴリ名。必要な場合のみ返す。
           example: 美容液
-        ingredients:
-          type: array
-          description: |
-            AI提案生成時に参照する成分名一覧。
-            ユーザー向けの成分検索には使用しない。
-          items:
-            type: string
-          example:
-            - ビフィズス菌培養溶解質
-            - ヒアルロン酸Na
-            - ナイアシンアミド
         created_at:
           type: string
           format: date-time
-          example: 2026-05-17T10:00:00+09:00
+          example: "2026-05-17T10:00:00.000Z"
         updated_at:
           type: string
           format: date-time
-          example: 2026-05-17T10:00:00+09:00
+          example: "2026-05-17T10:00:00.000Z"
 
-    UserItem:
+    UserItemCreateInput:
       type: object
-      required:
-        - id
-        - user_id
-        - item_id
-        - item
-        - created_at
-        - updated_at
+      required: [item_id]
+      properties:
+        item_id:
+          type: string
+          description: 追加する items.id
+          example: item-001
+
+    UserItemCreated:
+      type: object
+      required: [id, item_id]
       properties:
         id:
           type: string
-          format: uuid
-          example: a8a6c948-283f-40f4-9c4a-4034d5c91234
-        user_id:
-          type: string
-          description: Firebase Authentication の UID
-          example: firebase_uid_xxxxx
+          description: user_items.id
+          example: user_item_001
         item_id:
           type: string
-          format: uuid
-          example: 4d3e1e8a-0f4d-4e75-bd12-1b76d7991234
-        item:
-          $ref: "#/components/schemas/Item"
-        created_at:
-          type: string
-          format: date-time
-          example: 2026-05-17T10:00:00+09:00
-        updated_at:
-          type: string
-          format: date-time
-          example: 2026-05-17T10:00:00+09:00
+          description: items.id
+          example: item-001
 
     AISuggestionCreateInput:
       type: object
-      required:
-        - suggestion_type
+      required: [suggestion_type]
       properties:
         suggestion_type:
           type: string
-          enum:
-            - home_summary
-            - daily_comment
+          enum: [home_summary, daily_comment]
           example: home_summary
         target_date:
           type: string
           format: date
           nullable: true
           description: |
-            daily_comment の場合に対象日を指定する。
-            home_summary の場合は省略可能。
-          example: 2026-05-17
-        start_date:
-          type: string
-          format: date
-          nullable: true
-          description: |
-            home_summary の分析対象開始日。
-            未指定の場合はバックエンド側で直近7日などのデフォルト期間を使用する。
-          example: 2026-05-11
-        end_date:
-          type: string
-          format: date
-          nullable: true
-          description: |
-            home_summary の分析対象終了日。
-            未指定の場合はバックエンド側で当日を使用する。
-          example: 2026-05-17
+            daily_comment の場合の対象日。省略時は当日。
+            home_summary では未使用（分析期間はバックエンドが直近7日で算出）。
+          example: "2026-05-17"
 
     AISuggestion:
       type: object
-      required:
-        - id
-        - user_id
-        - suggested_at
-        - suggestion_type
-        - title
-        - created_at
+      required: [id, user_id, suggested_at, suggestion_type, title, created_at]
       properties:
         id:
           type: string
-          format: uuid
           example: 91d5c671-6f3d-48f2-b1e5-8acdbd9a1234
         user_id:
           type: string
@@ -1028,12 +867,10 @@ components:
         suggested_at:
           type: string
           format: date-time
-          example: 2026-05-17T10:00:00+09:00
+          example: "2026-05-17T10:00:00.000Z"
         suggestion_type:
           type: string
-          enum:
-            - home_summary
-            - daily_comment
+          enum: [home_summary, daily_comment]
           example: home_summary
         title:
           type: string
@@ -1041,26 +878,42 @@ components:
         body:
           type: string
           nullable: true
-          example: 直近1週間は肌状態が安定しています。今日はアイテムを重ねすぎず、シンプルなケアをおすすめします。
+          example: 直近1週間は肌状態が安定しています。今日はシンプルなケアがおすすめです。
         basis:
           type: string
           nullable: true
-          description: RAGや記録データに基づく根拠
-          example: 直近7日間の肌記録、使用アイテム、睡眠、食事、天気、成分情報を参照
+          description: home_summary のときに「商品名A × 商品名B」形で根拠を返す。daily_comment は null。
+          example: 化粧水A × 乳液B
         created_at:
           type: string
           format: date-time
-          example: 2026-05-17T10:00:00+09:00
+          example: "2026-05-17T10:00:00.000Z"
 
     ErrorResponse:
       type: object
-      required:
-        - error
-        - message
+      description: ハンドリング済みエラーの統一形（errors.ts）。
+      required: [error, message]
       properties:
         error:
           type: string
+          description: エラーコード（大文字）
           example: UNAUTHORIZED
         message:
           type: string
-          example: 認証情報が無効です
+          example: トークンが無効です
+
+    ServerException:
+      type: object
+      description: 未捕捉例外のグローバルハンドラ（onError）が返す形。
+      required: [status, message]
+      properties:
+        status:
+          type: string
+          example: error
+        message:
+          type: string
+          example: 予期せぬエラーが発生しました
+        stack:
+          type: string
+          nullable: true
+          description: NODE_ENV=development のときのみ含まれる。

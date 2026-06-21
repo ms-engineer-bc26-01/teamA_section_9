@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getHomeSummaryAiSuggestion,
   getLatestHomeSummaryAiSuggestion,
 } from "@/api/aiSuggestions";
 import { getDailyLogs } from "@/api/dailyLogs";
-import { ErrorMessage } from "@/components/common/ErrorMessage";
+import { ErrorFallback } from "@/components/common/ErrorFallback";
 import { Loading } from "@/components/common/Loading";
 import { AppShell } from "@/components/layout/AppShell";
 import { AiSuggestionCard } from "@/features/home/components/AiSuggestionCard";
+import { useApiError } from "@/hooks/useApiError";
 import { SkinCalendar } from "@/features/home/components/SkinCalendar";
 import type { AiSuggestion, DailyLog } from "@/types/models";
 
@@ -68,40 +69,44 @@ export default function HomePage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingHomeSummary, setIsGeneratingHomeSummary] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
+  const { error, clearError, handleError } = useApiError();
 
   const hasStartedHomeSummaryGeneration = useRef(false);
 
+  const fetchHomeData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      clearError();
+
+      const { startDate, endDate } = getRecentWeekRange();
+
+      const [dailyLogsResponse, latestSuggestionResponse] = await Promise.all([
+        getDailyLogs({
+          startDate,
+          endDate,
+        }),
+        getLatestHomeSummaryAiSuggestion(),
+      ]);
+
+      setDailyLogs(dailyLogsResponse);
+      setLatestSuggestion(latestSuggestionResponse);
+    } catch (nextError) {
+      handleError(nextError, {
+        fallbackMessage: "ホーム画面のデータ取得に失敗しました。",
+        context: "HomePage.fetchHomeData",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [clearError, handleError]);
+
   useEffect(() => {
-    const fetchHomeData = async () => {
-      try {
-        setIsLoading(true);
-        setErrorMessage("");
-
-        const { startDate, endDate } = getRecentWeekRange();
-
-        const [dailyLogsResponse, latestSuggestionResponse] = await Promise.all(
-          [
-            getDailyLogs({
-              startDate,
-              endDate,
-            }),
-            getLatestHomeSummaryAiSuggestion(),
-          ],
-        );
-
-        setDailyLogs(dailyLogsResponse);
-        setLatestSuggestion(latestSuggestionResponse);
-      } catch (error) {
-        console.error(error);
-        setErrorMessage("ホーム画面のデータ取得に失敗しました。");
-      } finally {
-        setIsLoading(false);
-      }
+    const runFetchHomeData = async () => {
+      await fetchHomeData();
     };
 
-    void fetchHomeData();
-  }, []);
+    void runFetchHomeData();
+  }, [fetchHomeData]);
 
   useEffect(() => {
     const generatePendingHomeSummary = async () => {
@@ -148,9 +153,15 @@ export default function HomePage() {
       <section className="space-y-4">
         {isLoading && <Loading text="ホーム画面を読み込み中..." />}
 
-        {!isLoading && errorMessage && <ErrorMessage message={errorMessage} />}
+        {!isLoading && error && (
+          <ErrorFallback
+            error={error}
+            onRetry={fetchHomeData}
+            isRetrying={isLoading}
+          />
+        )}
 
-        {!isLoading && !errorMessage && (
+        {!isLoading && !error && (
           <>
             {isGeneratingHomeSummary ? (
               <div className="rounded-3xl border border-rose-100 bg-rose-50 p-5 shadow-sm">
