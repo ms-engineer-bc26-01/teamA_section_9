@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { prisma } from "../lib/prisma.js";
 import { adminAuth } from "../config/firebase.js";
-import { unauthorized, badRequest, internalError } from "../lib/errors.js";
+import { unauthorized, badRequest, internalError, tokenExpired } from "../lib/errors.js";
 
 const app = new Hono();
 
@@ -56,6 +56,9 @@ app.get("/me", async (c) => {
     );
   } catch (error) {
     console.error("認証エラー:", error);
+    if ((error as any)?.code === "auth/id-token-expired") {
+      return tokenExpired(c);
+    }
     return unauthorized(c, "トークンの検証に失敗しました");
   }
 });
@@ -75,6 +78,9 @@ app.patch("/me", async (c) => {
     firebaseUid = decodedToken.uid;
   } catch (error) {
     console.error("認証エラー:", error);
+    if ((error as any)?.code === "auth/id-token-expired") {
+      return tokenExpired(c);
+    }
     return unauthorized(c, "トークンの検証に失敗しました");
   }
 

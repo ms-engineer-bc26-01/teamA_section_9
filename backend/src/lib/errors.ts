@@ -2,7 +2,7 @@ import type { Context } from "hono";
 
 /**
  * エラーレスポンスを統一形式 { error, message } で返す共通関数。
- * error にはコード(大文字)、message には人間向けの説明を入れる。
+ * error にはコード（大文字）、message には人間向けの説明を入れる。
  */
 export function errorResponse(
   c: Context,
@@ -16,6 +16,14 @@ export function errorResponse(
 /** 401 認証エラー */
 export function unauthorized(c: Context, message = "トークンが無効です") {
   return errorResponse(c, 401, "UNAUTHORIZED", message);
+}
+
+/** 401 トークン期限切れ（フロントは再ログインへ誘導する想定） */
+export function tokenExpired(
+  c: Context,
+  message = "トークンの有効期限が切れています。再ログインしてください。"
+) {
+  return errorResponse(c, 401, "TOKEN_EXPIRED", message);
 }
 
 /** 400 リクエスト不正 */
