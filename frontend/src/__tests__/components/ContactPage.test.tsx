@@ -13,6 +13,14 @@ describe("ContactPage", () => {
     render(<ContactPage />);
 
     expect(screen.getByText("support@example.com")).toBeInTheDocument();
+    expect(
+      screen.getByText("退会をご希望の場合も、お問い合わせ先までご連絡ください。"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "現時点ではアプリ内の退会機能は未実装です。退会をご希望の場合も、お問い合わせ先までご連絡ください。",
+      ),
+    ).not.toBeInTheDocument();
 
     const mailLink = screen.getByRole("link", { name: "メールを送る" });
     expect(mailLink).toHaveAttribute("href");

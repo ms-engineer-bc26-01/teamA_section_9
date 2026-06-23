@@ -1,6 +1,6 @@
 "use client";
 
-import { Select } from "@/components/common/Select";
+import { Dropdown } from "@/components/common/Dropdown";
 import { Textarea } from "@/components/common/Textarea";
 import { MEAL_BALANCE_OPTIONS, SLEEP_LEVEL_OPTIONS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -133,27 +133,25 @@ export const LifestyleFields = ({
 
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-          <Select
+          <Dropdown
             id="sleep-level"
             label="睡眠"
             placeholder="選択"
             value={sleepLevel}
             options={[...SLEEP_LEVEL_OPTIONS]}
-            onChange={(event) =>
-              onChange({ sleepLevel: event.target.value as SleepLevel | "" })
-            }
+            onChange={(value) => onChange({ sleepLevel: value as SleepLevel | "" })}
           />
         </div>
 
         <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-          <Select
+          <Dropdown
             id="meal-balance"
             label="食事のバランス"
             placeholder="選択"
             value={mealBalance}
             options={mealBalanceOptions}
-            onChange={(event) =>
-              onChange({ mealBalance: event.target.value as MealBalance | "" })
+            onChange={(value) =>
+              onChange({ mealBalance: value as MealBalance | "" })
             }
           />
         </div>

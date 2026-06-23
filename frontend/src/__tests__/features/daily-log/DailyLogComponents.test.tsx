@@ -121,12 +121,10 @@ describe("Daily-log components", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "生理がきた" }));
     fireEvent.click(screen.getByRole("button", { name: "晴れ" }));
-    fireEvent.change(screen.getByLabelText("睡眠"), {
-      target: { value: "long" },
-    });
-    fireEvent.change(screen.getByLabelText("食事のバランス"), {
-      target: { value: "bad" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: "睡眠" }));
+    fireEvent.click(screen.getByRole("option", { name: "ぐっすり" }));
+    fireEvent.click(screen.getByRole("button", { name: "食事のバランス" }));
+    fireEvent.click(screen.getByRole("option", { name: "悪い" }));
     fireEvent.change(screen.getByLabelText("ひとこと日記・気づき"), {
       target: { value: "少し乾燥した" },
     });
