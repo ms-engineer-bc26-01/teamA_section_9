@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getHomeSummaryAiSuggestion,
@@ -72,6 +73,11 @@ export default function HomePage() {
   const { error, clearError, handleError } = useApiError();
 
   const hasStartedHomeSummaryGeneration = useRef(false);
+
+  const todayDateString = formatDateKey(new Date());
+  const hasTodayDailyLog = dailyLogs.some(
+    (dailyLog) => dailyLog.logDate === todayDateString,
+  );
 
   const fetchHomeData = useCallback(async () => {
     try {
@@ -163,6 +169,44 @@ export default function HomePage() {
 
         {!isLoading && !error && (
           <>
+            <div className="rounded-3xl border border-rose-100 bg-rose-50 px-4 py-3 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-sm shadow-sm">
+                    💡
+                  </span>
+
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-bold text-rose-400">
+                      今日の記録
+                    </p>
+
+                    <p className="mt-0.5 text-xs font-bold leading-5 text-gray-700">
+                      {hasTodayDailyLog ? (
+                        "今日の記録は入力済みです✨"
+                      ) : (
+                        <>
+                          <span className="block">
+                            今日の記録がまだありません
+                          </span>
+                          <span className="block">入力しましょう📝</span>
+                        </>
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                {!hasTodayDailyLog && (
+                  <Link
+                    href="/record"
+                    className="shrink-0 rounded-full bg-rose-400 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-rose-500"
+                  >
+                    記録する
+                  </Link>
+                )}
+              </div>
+            </div>
+
             {isGeneratingHomeSummary ? (
               <div className="rounded-3xl border border-rose-100 bg-rose-50 p-5 shadow-sm">
                 <div className="mb-3 flex items-center gap-3">
