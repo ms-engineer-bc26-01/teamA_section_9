@@ -129,7 +129,7 @@ export const Dropdown = ({
                   setIsOpen(false);
                 }}
                 className={cn(
-                  "flex w-full items-center px-4 py-3 text-left text-sm transition first:rounded-t-xl last:rounded-b-xl",
+                  "flex w-full items-center px-4 py-3 text-left text-xs transition first:rounded-t-xl last:rounded-b-xl",
                   isSelected
                     ? "bg-rose-50 font-bold text-rose-500"
                     : "text-gray-700 hover:bg-gray-50",
