@@ -82,7 +82,35 @@ export const UserItemList = ({
     <>
       <section className="space-y-3">
         <div>
-          <h2 className="text-base font-bold text-gray-800">所有アイテム</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-bold text-gray-800">所有アイテム</h2>
+
+            {onClickRegister && (
+              <button
+                type="button"
+                onClick={onClickRegister}
+                // text-sm, font-bold, leading-none を削除しています
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-rose-400 text-white shadow-sm transition hover:bg-rose-500"
+                aria-label="アイテムを登録"
+              >
+                {/* テキストの + の代わりにSVGを使用 */}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+              </button>
+            )}
+          </div>
 
           <p className="mt-0.5 text-[11px] text-gray-500">
             現在登録数：{userItems.length}

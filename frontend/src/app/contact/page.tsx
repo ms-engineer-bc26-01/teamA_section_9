@@ -56,7 +56,7 @@ export default function ContactPage() {
           <p className="text-xs font-bold text-rose-500">退会をご希望の場合</p>
 
           <p className="mt-1 text-[11px] leading-relaxed text-gray-500">
-            現時点ではアプリ内の退会機能は未実装です。退会をご希望の場合も、お問い合わせ先までご連絡ください。
+            退会をご希望の場合も、お問い合わせ先までご連絡ください。
           </p>
         </div>
       </section>
